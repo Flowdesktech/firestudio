@@ -25,6 +25,19 @@ Perfect for **Firebase developers**, **backend engineers**, **database administr
 
 ---
 
+## 📸 Screenshots
+
+### Add Firebase Project
+![Add Project Dialog](screenshots/1.png)
+
+### Firestore Table View (Dark Theme)
+![Dark Theme Table View](screenshots/2.png)
+
+### Settings Dialog (Light Theme)
+![Light Theme with Settings](screenshots/3.png)
+
+---
+
 ## ✨ Features
 
 ### 🔐 Multiple Authentication Methods
