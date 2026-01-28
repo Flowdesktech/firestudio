@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * DocumentEditor Component
+ * Displays and edits a single Firestore document with multiple view modes
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -37,7 +42,29 @@ import {
     Code as JsonIcon,
 } from '@mui/icons-material';
 
+// Utilities
+import { getValueType, formatDisplayValue, copyToClipboard, validateJson } from '../utils';
+
+/**
+ * Theme colors for field types
+ */
+const TYPE_COLORS = {
+    String: '#4caf50',
+    Integer: '#2196f3',
+    Number: '#2196f3',
+    Boolean: '#ff9800',
+    Null: '#9e9e9e',
+    Undefined: '#9e9e9e',
+    Array: '#e91e63',
+    Map: '#9c27b0',
+    Timestamp: '#00bcd4',
+    GeoPoint: '#ff5722',
+};
+
+const getFieldColor = (type) => TYPE_COLORS[type] || '#fff';
+
 function DocumentEditor({ document, onUpdate, onDelete, loading }) {
+    // State
     const [editedData, setEditedData] = useState('');
     const [jsonError, setJsonError] = useState('');
     const [hasChanges, setHasChanges] = useState(false);
@@ -45,6 +72,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
     const [activeTab, setActiveTab] = useState(0);
     const [expandedNodes, setExpandedNodes] = useState({});
 
+    // Initialize editor when document changes
     useEffect(() => {
         if (document?.data) {
             const formatted = JSON.stringify(document.data, null, 2);
@@ -55,106 +83,70 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
         }
     }, [document]);
 
-    const handleDataChange = (e) => {
+    // Format value for display
+    const renderFieldValue = useCallback((value, type) => {
+        if (type === 'Null') return 'null';
+        if (type === 'String') return `"${value}"`;
+        if (type === 'Boolean') return value ? 'true' : 'false';
+        if (type === 'Array') return `[${value.length} items]`;
+        if (type === 'Map') return `{${Object.keys(value).length} fields}`;
+        return formatDisplayValue(value, type);
+    }, []);
+
+    // Event handlers
+    const handleDataChange = useCallback((e) => {
         const value = e.target.value;
         setEditedData(value);
         setHasChanges(true);
 
-        try {
-            JSON.parse(value);
-            setJsonError('');
-        } catch (err) {
-            setJsonError(err.message);
-        }
-    };
+        const { error } = validateJson(value);
+        setJsonError(error || '');
+    }, []);
 
-    const handleSave = () => {
+    const handleSave = useCallback(() => {
         if (jsonError || !document) return;
 
-        try {
-            const newData = JSON.parse(editedData);
-            onUpdate(document.path, newData);
+        const { valid, data } = validateJson(editedData);
+        if (valid) {
+            onUpdate(document.path, data);
             setHasChanges(false);
-        } catch (err) {
-            setJsonError(err.message);
         }
-    };
+    }, [jsonError, document, editedData, onUpdate]);
 
-    const handleDelete = () => {
+    const handleDelete = useCallback(() => {
         if (document) {
             onDelete(document.path);
             setDeleteDialogOpen(false);
         }
-    };
+    }, [document, onDelete]);
 
-    const handleCopyPath = () => {
+    const handleCopyPath = useCallback(() => {
         if (document?.path) {
-            navigator.clipboard.writeText(document.path);
+            copyToClipboard(document.path);
         }
-    };
+    }, [document]);
 
-    const handleCopyData = () => {
-        navigator.clipboard.writeText(editedData);
-    };
+    const handleCopyData = useCallback(() => {
+        copyToClipboard(editedData);
+    }, [editedData]);
 
-    const handleReset = () => {
+    const handleReset = useCallback(() => {
         if (document?.data) {
             setEditedData(JSON.stringify(document.data, null, 2));
             setJsonError('');
             setHasChanges(false);
         }
-    };
+    }, [document]);
 
-    const getFieldType = (value) => {
-        if (value === null) return 'null';
-        if (Array.isArray(value)) return 'array';
-        if (value instanceof Date) return 'timestamp';
-        if (typeof value === 'object' && value._seconds !== undefined) return 'timestamp';
-        if (typeof value === 'object' && value._latitude !== undefined) return 'geopoint';
-        return typeof value;
-    };
-
-    const getFieldColor = (type) => {
-        const colors = {
-            string: '#4caf50',
-            number: '#2196f3',
-            boolean: '#ff9800',
-            null: '#9e9e9e',
-            array: '#e91e63',
-            object: '#9c27b0',
-            timestamp: '#00bcd4',
-            geopoint: '#ff5722',
-        };
-        return colors[type] || '#fff';
-    };
-
-    const renderFieldValue = (value, type) => {
-        if (type === 'null') return 'null';
-        if (type === 'string') return `"${value}"`;
-        if (type === 'boolean') return value ? 'true' : 'false';
-        if (type === 'array') return `[${value.length} items]`;
-        if (type === 'object') return `{${Object.keys(value).length} fields}`;
-        if (type === 'timestamp' && value._seconds) {
-            return new Date(value._seconds * 1000).toISOString();
-        }
-        if (type === 'geopoint') {
-            return `(${value._latitude}, ${value._longitude})`;
-        }
-        return String(value);
-    };
-
-    const toggleNode = (path) => {
-        setExpandedNodes(prev => ({
-            ...prev,
-            [path]: !prev[path]
-        }));
-    };
+    const toggleNode = useCallback((path) => {
+        setExpandedNodes(prev => ({ ...prev, [path]: !prev[path] }));
+    }, []);
 
     // Tree View Renderer
     const renderTreeNode = (key, value, path = '', depth = 0) => {
-        const type = getFieldType(value);
+        const type = getValueType(value);
         const color = getFieldColor(type);
-        const isExpandable = type === 'object' || type === 'array';
+        const isExpandable = type === 'Map' || type === 'Array';
         const nodePath = path ? `${path}.${key}` : key;
         const isExpanded = expandedNodes[nodePath];
 
@@ -167,9 +159,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                         py: 0.5,
                         pl: depth * 2,
                         cursor: isExpandable ? 'pointer' : 'default',
-                        '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.05)'
-                        }
+                        '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)' }
                     }}
                     onClick={() => isExpandable && toggleNode(nodePath)}
                 >
@@ -205,7 +195,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                         </Typography>
                     )}
                 </Box>
-                {isExpandable && isExpanded && (
+                {isExpandable && isExpanded && value && (
                     <Box>
                         {Object.entries(value).map(([k, v]) =>
                             renderTreeNode(k, v, nodePath, depth + 1)
@@ -219,7 +209,6 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
     // Grid View Renderer
     const renderGridView = () => {
         if (!document?.data) return null;
-        const entries = Object.entries(document.data);
 
         return (
             <Box
@@ -230,8 +219,8 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                     p: 2,
                 }}
             >
-                {entries.map(([key, value]) => {
-                    const type = getFieldType(value);
+                {Object.entries(document.data).map(([key, value]) => {
+                    const type = getValueType(value);
                     const color = getFieldColor(type);
 
                     return (
@@ -275,7 +264,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                                     overflow: 'auto',
                                 }}
                             >
-                                {type === 'object' || type === 'array' ? (
+                                {type === 'Map' || type === 'Array' ? (
                                     <pre
                                         style={{
                                             margin: 0,
@@ -330,7 +319,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                     </TableHead>
                     <TableBody>
                         {Object.entries(document.data).map(([key, value]) => {
-                            const type = getFieldType(value);
+                            const type = getValueType(value);
                             const color = getFieldColor(type);
 
                             return (
@@ -351,7 +340,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                                         />
                                     </TableCell>
                                     <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.85rem', color: color, borderBottom: '1px solid #1e3a5f' }}>
-                                        {type === 'object' || type === 'array' ? (
+                                        {type === 'Map' || type === 'Array' ? (
                                             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
                                                 {JSON.stringify(value, null, 2)}
                                             </pre>
@@ -368,6 +357,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
         );
     };
 
+    // Empty state
     if (!document) {
         return (
             <Box
@@ -391,13 +381,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             {/* Header */}
-            <Box
-                sx={{
-                    p: 2,
-                    borderBottom: '1px solid #1e3a5f',
-                    backgroundColor: '#0f1729',
-                }}
-            >
+            <Box sx={{ p: 2, borderBottom: '1px solid #1e3a5f', backgroundColor: '#0f1729' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <DocumentIcon sx={{ mr: 1, color: '#2196f3' }} />
@@ -452,7 +436,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                 </Typography>
 
                 {/* Subcollections */}
-                {document.subcollections && document.subcollections.length > 0 && (
+                {document.subcollections?.length > 0 && (
                     <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                         <FolderIcon sx={{ fontSize: 16, color: '#666' }} />
                         <Typography variant="caption" sx={{ color: '#666' }}>
@@ -479,13 +463,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                 <Tabs
                     value={activeTab}
                     onChange={(_, v) => setActiveTab(v)}
-                    sx={{
-                        '& .MuiTab-root': {
-                            textTransform: 'none',
-                            minHeight: 40,
-                            minWidth: 80,
-                        }
-                    }}
+                    sx={{ '& .MuiTab-root': { textTransform: 'none', minHeight: 40, minWidth: 80 } }}
                 >
                     <Tab icon={<JsonIcon fontSize="small" />} iconPosition="start" label="JSON" />
                     <Tab icon={<TableIcon fontSize="small" />} iconPosition="start" label="Table" />
@@ -497,7 +475,6 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
             {/* Content */}
             <Box sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
                 {activeTab === 0 && (
-                    /* JSON Editor */
                     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                         <textarea
                             value={editedData}
@@ -530,7 +507,6 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
                 {activeTab === 1 && renderTableView()}
 
                 {activeTab === 2 && (
-                    /* Tree View */
                     <Box sx={{ p: 2 }}>
                         {document.data && Object.entries(document.data).map(([key, value]) =>
                             renderTreeNode(key, value)
@@ -550,12 +526,7 @@ function DocumentEditor({ document, onUpdate, onDelete, loading }) {
             <Dialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
-                PaperProps={{
-                    sx: {
-                        backgroundColor: '#16213e',
-                        backgroundImage: 'none',
-                    }
-                }}
+                PaperProps={{ sx: { backgroundColor: '#16213e', backgroundImage: 'none' } }}
             >
                 <DialogTitle>Delete Document?</DialogTitle>
                 <DialogContent>

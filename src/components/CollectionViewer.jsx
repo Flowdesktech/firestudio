@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+/**
+ * CollectionViewer Component
+ * Displays and manages documents in a Firestore collection with table, tree, and JSON views
+ */
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -30,7 +35,6 @@ import {
     Delete as DeleteIcon,
     Refresh as RefreshIcon,
     Add as AddIcon,
-    Edit as EditIcon,
     ViewList as TableIcon,
     AccountTree as TreeIcon,
     Code as JsonIcon,
@@ -39,8 +43,34 @@ import {
     MoreVert as MoreVertIcon,
     FileDownload as ExportIcon,
     FileUpload as ImportIcon,
-    ContentCopy as CopyIcon,
 } from '@mui/icons-material';
+
+// Utilities
+import {
+    getValueType,
+    formatDisplayValue,
+    parseEditValue,
+    extractAllFields,
+    documentsToJson
+} from '../utils';
+
+/**
+ * Theme colors for field types
+ */
+const TYPE_COLORS = {
+    String: '#4caf50',
+    Integer: '#2196f3',
+    Number: '#2196f3',
+    Boolean: '#ff9800',
+    Null: '#9e9e9e',
+    Undefined: '#9e9e9e',
+    Array: '#e91e63',
+    Map: '#9c27b0',
+    Timestamp: '#00bcd4',
+    GeoPoint: '#ff5722',
+};
+
+const getFieldColor = (type) => TYPE_COLORS[type] || '#fff';
 
 function CollectionViewer({
     collectionPath,
@@ -54,13 +84,13 @@ function CollectionViewer({
     loading,
     addLog,
 }) {
+    // State
     const [activeTab, setActiveTab] = useState(0);
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [expandedDocs, setExpandedDocs] = useState({});
     const [jsonEditData, setJsonEditData] = useState('');
     const [jsonError, setJsonError] = useState('');
-    const [selectedDocId, setSelectedDocId] = useState(null);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [newDocId, setNewDocId] = useState('');
     const [newDocData, setNewDocData] = useState('{\n  \n}');
@@ -68,124 +98,45 @@ function CollectionViewer({
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState(null);
 
-    // Get all unique field names from all documents
-    const allFields = useMemo(() => {
-        const fields = new Set();
-        documents.forEach(doc => {
-            if (doc.data) {
-                Object.keys(doc.data).forEach(key => fields.add(key));
-            }
-        });
-        return Array.from(fields).sort();
-    }, [documents]);
+    // Computed values
+    const allFields = useMemo(() => extractAllFields(documents), [documents]);
 
-    // Initialize JSON edit data when switching to JSON tab or documents change
+    // Initialize JSON edit data when switching to JSON tab
     useEffect(() => {
         if (activeTab === 2) {
-            const docsObject = {};
-            documents.forEach(doc => {
-                docsObject[doc.id] = doc.data;
-            });
-            setJsonEditData(JSON.stringify(docsObject, null, 2));
+            setJsonEditData(JSON.stringify(documentsToJson(documents), null, 2));
             setJsonError('');
         }
     }, [activeTab, documents]);
 
-    const getFieldType = (value) => {
-        if (value === null) return 'null';
-        if (value === undefined) return 'undefined';
-        if (Array.isArray(value)) return 'array';
-        if (value instanceof Date) return 'timestamp';
-        if (typeof value === 'object' && value._seconds !== undefined) return 'timestamp';
-        if (typeof value === 'object' && value._latitude !== undefined) return 'geopoint';
-        return typeof value;
-    };
+    // Format value for display
+    const formatValue = useCallback((value, type) => {
+        if (type === 'Array' || type === 'Map') return JSON.stringify(value);
+        return formatDisplayValue(value, type);
+    }, []);
 
-    const getFieldColor = (type) => {
-        const colors = {
-            string: '#4caf50',
-            number: '#2196f3',
-            boolean: '#ff9800',
-            null: '#9e9e9e',
-            undefined: '#9e9e9e',
-            array: '#e91e63',
-            object: '#9c27b0',
-            timestamp: '#00bcd4',
-            geopoint: '#ff5722',
-        };
-        return colors[type] || '#fff';
-    };
-
-    const formatValue = (value, type) => {
-        if (type === 'null' || type === 'undefined') return type;
-        if (type === 'string') return value;
-        if (type === 'boolean') return value ? 'true' : 'false';
-        if (type === 'array') return JSON.stringify(value);
-        if (type === 'object') return JSON.stringify(value);
-        if (type === 'timestamp' && value._seconds) {
-            return new Date(value._seconds * 1000).toISOString();
-        }
-        if (type === 'geopoint') {
-            return `(${value._latitude}, ${value._longitude})`;
-        }
-        return String(value);
-    };
-
-    const parseEditValue = (value, originalValue) => {
-        const originalType = getFieldType(originalValue);
-
-        // Try to preserve the original type
-        if (originalType === 'number') {
-            const num = Number(value);
-            if (!isNaN(num)) return num;
-        }
-        if (originalType === 'boolean') {
-            if (value === 'true') return true;
-            if (value === 'false') return false;
-        }
-        if (originalType === 'null' && value === 'null') return null;
-        if (originalType === 'array' || originalType === 'object') {
-            try {
-                return JSON.parse(value);
-            } catch {
-                return value;
-            }
-        }
-
-        // Auto-detect type for new values
-        if (value === 'null') return null;
-        if (value === 'true') return true;
-        if (value === 'false') return false;
-        if (!isNaN(value) && value !== '') return Number(value);
-
-        try {
-            const parsed = JSON.parse(value);
-            if (typeof parsed === 'object') return parsed;
-        } catch { }
-
-        return value;
-    };
-
-    const handleCellEdit = (docId, field, value) => {
+    // Cell editing handlers
+    const handleCellEdit = useCallback((docId, field, value) => {
+        const type = getValueType(value);
         setEditingCell({ docId, field });
-        setEditValue(formatValue(value, getFieldType(value)));
-    };
+        setEditValue(formatValue(value, type));
+    }, [formatValue]);
 
-    const handleCellSave = async () => {
+    const handleCellSave = useCallback(async () => {
         if (!editingCell) return;
 
         const doc = documents.find(d => d.id === editingCell.docId);
         if (!doc) return;
 
-        const newValue = parseEditValue(editValue, doc.data[editingCell.field]);
+        const newValue = parseEditValue(editValue);
         const newData = { ...doc.data, [editingCell.field]: newValue };
 
         await onUpdateDocument(doc.path, newData);
         setEditingCell(null);
         addLog?.('success', `Updated ${editingCell.docId}.${editingCell.field}`);
-    };
+    }, [editingCell, editValue, documents, onUpdateDocument, addLog]);
 
-    const handleCellKeyDown = (e) => {
+    const handleCellKeyDown = useCallback((e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleCellSave();
@@ -193,9 +144,10 @@ function CollectionViewer({
         if (e.key === 'Escape') {
             setEditingCell(null);
         }
-    };
+    }, [handleCellSave]);
 
-    const handleJsonSave = async () => {
+    // JSON handlers
+    const handleJsonSave = useCallback(async () => {
         if (jsonError) return;
 
         try {
@@ -213,9 +165,9 @@ function CollectionViewer({
         } catch (err) {
             addLog?.('error', 'Failed to save JSON: ' + err.message);
         }
-    };
+    }, [jsonError, jsonEditData, documents, onUpdateDocument, onRefresh, addLog]);
 
-    const handleJsonChange = (value) => {
+    const handleJsonChange = useCallback((value) => {
         setJsonEditData(value);
         try {
             JSON.parse(value);
@@ -223,9 +175,10 @@ function CollectionViewer({
         } catch (err) {
             setJsonError(err.message);
         }
-    };
+    }, []);
 
-    const handleCreateDocument = async () => {
+    // Document handlers
+    const handleCreateDocument = useCallback(async () => {
         try {
             const data = JSON.parse(newDocData);
             await onCreateDocument(collectionPath, newDocId, data);
@@ -236,29 +189,31 @@ function CollectionViewer({
         } catch (err) {
             addLog?.('error', 'Invalid JSON: ' + err.message);
         }
-    };
+    }, [newDocData, newDocId, collectionPath, onCreateDocument, addLog]);
 
-    const handleDeleteDocument = async () => {
+    const handleDeleteDocument = useCallback(async () => {
         if (docToDelete) {
             await onDeleteDocument(docToDelete.path);
             setDeleteDialogOpen(false);
             setDocToDelete(null);
             addLog?.('success', `Deleted document ${docToDelete.id}`);
         }
-    };
+    }, [docToDelete, onDeleteDocument, addLog]);
 
-    const toggleDocExpand = (docId) => {
-        setExpandedDocs(prev => ({
-            ...prev,
-            [docId]: !prev[docId]
-        }));
-    };
+    const toggleDocExpand = useCallback((docId) => {
+        setExpandedDocs(prev => ({ ...prev, [docId]: !prev[docId] }));
+    }, []);
 
-    // Render Tree Node for tree view
+    const copyToClipboard = useCallback((text) => {
+        navigator.clipboard.writeText(text);
+        addLog?.('info', `Copied: ${text}`);
+    }, [addLog]);
+
+    // Render Tree Node
     const renderTreeNode = (key, value, path, docId, depth = 0) => {
-        const type = getFieldType(value);
+        const type = getValueType(value);
         const color = getFieldColor(type);
-        const isExpandable = type === 'object' || type === 'array';
+        const isExpandable = type === 'Map' || type === 'Array';
         const nodePath = `${docId}.${path}`;
         const isExpanded = expandedDocs[nodePath];
         const isEditing = editingCell?.docId === docId && editingCell?.field === path;
@@ -271,9 +226,7 @@ function CollectionViewer({
                         alignItems: 'center',
                         py: 0.5,
                         pl: depth * 2,
-                        '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.03)',
-                        },
+                        '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' },
                     }}
                 >
                     {isExpandable ? (
@@ -341,7 +294,7 @@ function CollectionViewer({
                         )
                     )}
                 </Box>
-                {isExpandable && isExpanded && (
+                {isExpandable && isExpanded && value && (
                     <Box>
                         {Object.entries(value).map(([k, v]) =>
                             renderTreeNode(k, v, `${path}.${k}`, docId, depth + 1)
@@ -400,9 +353,7 @@ function CollectionViewer({
                     {documents.map((doc) => (
                         <TableRow
                             key={doc.id}
-                            sx={{
-                                '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' },
-                            }}
+                            sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' } }}
                         >
                             <TableCell
                                 sx={{
@@ -419,10 +370,7 @@ function CollectionViewer({
                                 <Tooltip title="Copy ID">
                                     <Box
                                         sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(doc.id);
-                                            addLog?.('info', `Copied: ${doc.id}`);
-                                        }}
+                                        onClick={() => copyToClipboard(doc.id)}
                                     >
                                         {doc.id}
                                     </Box>
@@ -430,7 +378,7 @@ function CollectionViewer({
                             </TableCell>
                             {allFields.map(field => {
                                 const value = doc.data?.[field];
-                                const type = getFieldType(value);
+                                const type = getValueType(value);
                                 const color = getFieldColor(type);
                                 const isEditing = editingCell?.docId === doc.id && editingCell?.field === field;
 
@@ -456,7 +404,7 @@ function CollectionViewer({
                                                 onKeyDown={handleCellKeyDown}
                                                 autoFocus
                                                 fullWidth
-                                                multiline={type === 'object' || type === 'array'}
+                                                multiline={type === 'Map' || type === 'Array'}
                                                 maxRows={4}
                                                 sx={{
                                                     '& .MuiInputBase-input': {
@@ -471,10 +419,7 @@ function CollectionViewer({
                                                 onClick={() => handleCellEdit(doc.id, field, value)}
                                                 sx={{
                                                     cursor: 'pointer',
-                                                    '&:hover': {
-                                                        backgroundColor: 'rgba(255,255,255,0.05)',
-                                                        borderRadius: 1,
-                                                    },
+                                                    '&:hover': { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 1 },
                                                     p: 0.5,
                                                     minHeight: 24,
                                                 }}
@@ -562,9 +507,9 @@ function CollectionViewer({
                             </IconButton>
                         </Tooltip>
                     </Box>
-                    {expandedDocs[doc.id] && (
+                    {expandedDocs[doc.id] && doc.data && (
                         <Box sx={{ p: 1 }}>
-                            {doc.data && Object.entries(doc.data).map(([key, value]) =>
+                            {Object.entries(doc.data).map(([key, value]) =>
                                 renderTreeNode(key, value, key, doc.id)
                             )}
                         </Box>
@@ -616,6 +561,7 @@ function CollectionViewer({
         </Box>
     );
 
+    // Empty state
     if (!collectionPath) {
         return (
             <Box
@@ -684,12 +630,7 @@ function CollectionViewer({
                     onChange={(_, v) => setActiveTab(v)}
                     sx={{
                         minHeight: 36,
-                        '& .MuiTab-root': {
-                            textTransform: 'none',
-                            minHeight: 36,
-                            minWidth: 80,
-                            py: 0,
-                        },
+                        '& .MuiTab-root': { textTransform: 'none', minHeight: 36, minWidth: 80, py: 0 },
                     }}
                 >
                     <Tab icon={<TableIcon fontSize="small" />} iconPosition="start" label="Table" />
