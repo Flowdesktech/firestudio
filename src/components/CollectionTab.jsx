@@ -501,7 +501,19 @@ async function run() {
         const newData = { ...doc.data, [editingCell.field]: newValue };
 
         try {
-            const result = await window.electronAPI.setDocument({ documentPath: doc.path, data: newData });
+            let result;
+            if (project?.authMethod === 'google') {
+                // Use Google OAuth REST API
+                result = await window.electronAPI.googleSetDocument({
+                    projectId: project.projectId,
+                    collectionPath: collectionPath,
+                    documentId: doc.id,
+                    data: newData
+                });
+            } else {
+                // Use service account
+                result = await window.electronAPI.setDocument({ documentPath: doc.path, data: newData });
+            }
             if (result.success) {
                 addLog?.('success', `Updated ${doc.id}.${editingCell.field}`);
                 setDocuments(prev => prev.map(d =>

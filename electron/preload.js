@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Google OAuth Firestore operations (REST API)
     googleGetCollections: (projectId) => ipcRenderer.invoke('google:getCollections', projectId),
     googleGetDocuments: (params) => ipcRenderer.invoke('google:getDocuments', params),
+    googleSetDocument: (params) => ipcRenderer.invoke('google:setDocument', params),
 
     // Firebase Storage operations (Service Account)
     storageListFiles: (params) => ipcRenderer.invoke('storage:listFiles', params),

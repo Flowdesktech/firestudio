@@ -935,6 +935,77 @@ ipcMain.handle('google:getCollections', async (event, projectId) => {
     }
 });
 
+// Update/Set a document using OAuth (REST API)
+ipcMain.handle('google:setDocument', async (event, { projectId, collectionPath, documentId, data }) => {
+    try {
+        if (!googleAccessToken) {
+            return { success: false, error: 'Not signed in with Google' };
+        }
+
+        const fetch = require('node-fetch');
+
+        // Convert data to Firestore REST API format
+        const fields = {};
+        for (const [key, value] of Object.entries(data)) {
+            fields[key] = convertToFirestoreValue(value);
+        }
+
+        const documentPath = `${collectionPath}/${documentId}`;
+        const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${documentPath}`;
+
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${googleAccessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fields })
+        });
+
+        const responseData = await response.json();
+
+        if (responseData.error) {
+            return { success: false, error: responseData.error.message };
+        }
+
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// Helper: Convert JS value to Firestore REST API format
+function convertToFirestoreValue(value) {
+    if (value === null) return { nullValue: null };
+    if (typeof value === 'boolean') return { booleanValue: value };
+    if (typeof value === 'number') {
+        return Number.isInteger(value) ? { integerValue: value.toString() } : { doubleValue: value };
+    }
+    if (typeof value === 'string') return { stringValue: value };
+    if (Array.isArray(value)) {
+        return { arrayValue: { values: value.map(convertToFirestoreValue) } };
+    }
+    if (typeof value === 'object') {
+        // Check for special Firestore types
+        if (value._seconds !== undefined) {
+            // Timestamp
+            const date = new Date(value._seconds * 1000);
+            return { timestampValue: date.toISOString() };
+        }
+        if (value._latitude !== undefined && value._longitude !== undefined) {
+            // GeoPoint
+            return { geoPointValue: { latitude: value._latitude, longitude: value._longitude } };
+        }
+        // Regular map/object
+        const fields = {};
+        for (const [k, v] of Object.entries(value)) {
+            fields[k] = convertToFirestoreValue(v);
+        }
+        return { mapValue: { fields } };
+    }
+    return { stringValue: String(value) };
+}
+
 // Get documents from a collection using OAuth (REST API)
 ipcMain.handle('google:getDocuments', async (event, { projectId, collectionPath, limit = 50 }) => {
     try {
