@@ -1,0 +1,13 @@
+# robots.txt for Firestudio
+# https://firestudio.flowdesk.tech
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://firestudio.flowdesk.tech/sitemap.xml
+
+# Disallow any potential admin or private paths
+Disallow: /admin/
+Disallow: /api/
+Disallow: /.well-known/
