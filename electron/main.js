@@ -583,6 +583,8 @@ ipcMain.handle('google:signIn', async (event) => {
             width: 500,
             height: 700,
             show: true,
+            title: 'Sign in with Google - Firestudio',
+            icon: path.join(__dirname, '../assets/icon.png'),
             webPreferences: {
                 nodeIntegration: false,
                 contextIsolation: true,
