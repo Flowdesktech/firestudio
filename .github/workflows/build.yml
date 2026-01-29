@@ -29,11 +29,11 @@ jobs:
 
       - name: Build Windows (unsigned)
         if: vars.ENABLE_CODE_SIGNING != 'true'
-        run: npm run build && npx electron-builder --win --publish never
+        run: npm run build:win
 
       - name: Build Windows (signed)
         if: vars.ENABLE_CODE_SIGNING == 'true'
-        run: npm run build && npx electron-builder --win --publish never
+        run: npm run build:win
         env:
           CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
@@ -69,11 +69,11 @@ jobs:
 
       - name: Build macOS (unsigned)
         if: vars.ENABLE_CODE_SIGNING != 'true'
-        run: npm run build && npx electron-builder --mac --publish never
+        run: npm run build:mac
 
       - name: Build macOS (signed)
         if: vars.ENABLE_CODE_SIGNING == 'true'
-        run: npm run build && npx electron-builder --mac --publish never
+        run: npm run build:mac
         env:
           CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -111,7 +111,7 @@ jobs:
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
 
       - name: Build Linux
-        run: npm run build && npx electron-builder --linux --publish never
+        run: npm run build:linux
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
