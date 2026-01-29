@@ -8,6 +8,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    environment: ${{ vars.ENABLE_CODE_SIGNING == 'true' && 'production' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,11 +27,17 @@ jobs:
           echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" > .env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
 
-      - name: Build Windows
+      - name: Build Windows (unsigned)
+        if: vars.ENABLE_CODE_SIGNING != 'true'
         run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # Windows code signing (optional - set these secrets if you have a certificate)
+
+      - name: Build Windows (signed)
+        if: vars.ENABLE_CODE_SIGNING == 'true'
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
@@ -44,6 +51,7 @@ jobs:
 
   build-mac:
     runs-on: macos-latest
+    environment: ${{ vars.ENABLE_CODE_SIGNING == 'true' && 'production' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,14 +70,19 @@ jobs:
           echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" > .env
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
 
-      - name: Build macOS
+      - name: Build macOS (unsigned)
+        if: vars.ENABLE_CODE_SIGNING != 'true'
         run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # macOS code signing (optional - set these secrets if you have Apple Developer account)
+
+      - name: Build macOS (signed)
+        if: vars.ENABLE_CODE_SIGNING == 'true'
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          # macOS notarization (optional)
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

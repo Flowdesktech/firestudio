@@ -51,7 +51,10 @@
     "firefoo",
     "firefoo-alternative"
   ],
-  "author": "",
+  "author": {
+    "name": "Flowdesk",
+    "email": "contact@flowdesk.tech"
+  },
   "license": "MIT",
   "dependencies": {
     "@emotion/react": "^11.11.0",
