@@ -87,5 +87,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     googleDeleteDocument: (params) => ipcRenderer.invoke('google:deleteDocument', params),
 
     // Google OAuth Count Documents
-    googleCountDocuments: (params) => ipcRenderer.invoke('google:countDocuments', params)
+    googleCountDocuments: (params) => ipcRenderer.invoke('google:countDocuments', params),
+
+    // Theme
+    setNativeTheme: (theme) => ipcRenderer.invoke('theme:set', theme),
+    getNativeTheme: () => ipcRenderer.invoke('theme:get')
 });

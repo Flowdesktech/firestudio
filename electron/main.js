@@ -6,7 +6,7 @@
 // Load environment variables first
 require('./utils/env');
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeTheme, ipcMain } = require('electron');
 const path = require('path');
 
 // Modules
@@ -51,6 +51,23 @@ function createWindow() {
 // ============================================
 // App Lifecycle
 // ============================================
+
+// ============================================
+// Theme Handler
+// ============================================
+
+ipcMain.handle('theme:set', (event, theme) => {
+    // theme can be 'dark', 'light', or 'system'
+    nativeTheme.themeSource = theme;
+    return { success: true };
+});
+
+ipcMain.handle('theme:get', () => {
+    return {
+        themeSource: nativeTheme.themeSource,
+        shouldUseDarkColors: nativeTheme.shouldUseDarkColors
+    };
+});
 
 app.whenReady().then(() => {
     createAppMenu();

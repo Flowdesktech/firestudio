@@ -32,6 +32,16 @@ export function SettingsProvider({ children }) {
         localStorage.setItem('firefoo-settings', JSON.stringify(settings));
     }, [settings]);
 
+    // Sync native theme with settings
+    useEffect(() => {
+        if (window.electronAPI?.setNativeTheme) {
+            // Map our theme setting to Electron's nativeTheme
+            // 'auto' maps to 'system' in Electron
+            const nativeTheme = settings.theme === 'auto' ? 'system' : settings.theme;
+            window.electronAPI.setNativeTheme(nativeTheme);
+        }
+    }, [settings.theme]);
+
     const updateSetting = (key, value) => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
