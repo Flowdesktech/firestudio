@@ -50,3 +50,13 @@ export {
     generateId,
     truncateString
 } from './commonUtils';
+
+// Auto-completion utilities
+export {
+    firestoreCompletions,
+    jsBoilerplateCompletions,
+    consoleCompletions,
+    jsEditorCompletions,
+    findCompletion,
+    getMatchingCompletions
+} from './completions';

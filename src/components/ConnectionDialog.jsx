@@ -13,6 +13,7 @@ import {
     Tabs,
     Tab,
     useTheme,
+    alpha,
 } from '@mui/material';
 import {
     FolderOpen as FolderOpenIcon,
@@ -23,7 +24,7 @@ import {
 
 function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }) {
     const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
+    // isDark removed, use theme.palette directly
     const [tabIndex, setTabIndex] = useState(0);
     const [serviceAccountPath, setServiceAccountPath] = useState('');
 
@@ -79,7 +80,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading })
                 {tabIndex === 0 ? (
                     /* Google Sign-In Tab */
                     <Box sx={{ py: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 3, color: isDark ? '#aaa' : '#666' }}>
+                        <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
                             Sign in with your Google account to access your Firebase projects.
                             This uses OAuth to securely authenticate without storing credentials.
                         </Typography>
@@ -106,7 +107,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading })
                             </Button>
                             {loading && (
                                 <Box sx={{ textAlign: 'center' }}>
-                                    <Typography variant="body2" sx={{ color: isDark ? '#aaa' : '#666', mb: 1 }}>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
                                         Complete sign-in in your browser, then return here.
                                     </Typography>
                                     <Button
@@ -125,8 +126,8 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading })
                             )}
                         </Box>
 
-                        <Box sx={{ p: 2, backgroundColor: isDark ? 'rgba(66, 133, 244, 0.15)' : '#e3f2fd', borderRadius: 1 }}>
-                            <Typography variant="caption" sx={{ color: isDark ? '#90caf9' : '#1565c0' }}>
+                        <Box sx={{ p: 2, bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1), borderRadius: 1 }}>
+                            <Typography variant="caption" sx={{ color: 'primary.main' }}>
                                 <strong>Benefits of Google Sign-In:</strong>
                                 <ul style={{ marginTop: 8, paddingLeft: 16, marginBottom: 0 }}>
                                     <li>No need to download service account files</li>
@@ -140,7 +141,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading })
                 ) : (
                     /* Service Account Tab */
                     <Box sx={{ py: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 3, color: isDark ? '#aaa' : '#666' }}>
+                        <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
                             Connect using a service account JSON file for full admin access to your Firestore database.
                         </Typography>
 
@@ -165,11 +166,11 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading })
                             </Button>
                         </Box>
 
-                        <Box sx={{ mt: 3, p: 2, backgroundColor: isDark ? '#333' : '#f5f5f5', borderRadius: 1 }}>
-                            <Typography variant="caption" sx={{ color: isDark ? '#aaa' : '#666' }}>
+                        <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 <strong>How to get your service account:</strong>
                                 <ol style={{ marginTop: 8, paddingLeft: 16, marginBottom: 0 }}>
-                                    <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" style={{ color: isDark ? '#90caf9' : '#1976d2' }}>Firebase Console</a></li>
+                                    <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" style={{ color: theme.palette.primary.main }}>Firebase Console</a></li>
                                     <li>Select your project</li>
                                     <li>Go to Project Settings (gear icon)</li>
                                     <li>Click on "Service Accounts" tab</li>

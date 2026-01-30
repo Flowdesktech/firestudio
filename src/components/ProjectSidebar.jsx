@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -17,8 +17,8 @@ import {
     Add as AddIcon,
     ExpandMore as ExpandMoreIcon,
     ChevronRight as ChevronRightIcon,
-    Storage as CollectionIcon,
-    Folder as FolderIcon,
+    Layers as CollectionIcon,
+    Folder as ProjectIcon,
     Refresh as RefreshIcon,
     MoreVert as MoreVertIcon,
     Delete as DeleteIcon,
@@ -41,6 +41,7 @@ import {
     Numbers as NumbersIcon,
     Link as LinkIcon,
     NoteAdd as AddDocIcon,
+    Code as CodeIcon,
 } from '@mui/icons-material';
 import { useProjects } from '../context/ProjectsContext';
 
@@ -72,12 +73,26 @@ function ProjectSidebar({
     onOpenSettings,
     onOpenFavorites,
     onOpenConsole,
+    onOpenSavedQueries,
 }) {
     const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
     const { reauthenticateAccount } = useProjects();
 
-    const [expandedItems, setExpandedItems] = useState({});
+    // Load expanded state from localStorage
+    const [expandedItems, setExpandedItems] = useState(() => {
+        try {
+            const saved = localStorage.getItem('firestudio-sidebar-expanded');
+            return saved ? JSON.parse(saved) : {};
+        } catch {
+            return {};
+        }
+    });
+
+    // Save expanded state to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('firestudio-sidebar-expanded', JSON.stringify(expandedItems));
+    }, [expandedItems]);
+
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [menuTarget, setMenuTarget] = useState(null);
     const [reconnecting, setReconnecting] = useState(null);
@@ -137,51 +152,62 @@ function ProjectSidebar({
     const googleAccounts = projects.filter(p => p.type === 'googleAccount');
     const serviceAccountProjects = projects.filter(p => p.authMethod === 'serviceAccount');
 
+    const isDark = theme.palette.mode === 'dark';
+
     return (
         <Box
             sx={{
-                width: 240,
-                minWidth: 240,
-                borderRight: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
+                width: 260,
+                minWidth: 260,
+                borderRight: 1,
+                borderColor: 'divider',
                 display: 'flex',
                 flexDirection: 'column',
-                backgroundColor: isDark ? '#252526' : '#fff',
+                bgcolor: 'background.paper',
                 height: '100%',
             }}
         >
             {/* Header */}
             <Box
                 sx={{
-                    p: 1,
+                    px: 1.5,
+                    py: 1.25,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
+                    borderBottom: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'background.default',
                 }}
             >
+                <Typography sx={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                }}>
+                    Projects
+                </Typography>
                 <Tooltip title="Add Project">
-                    <Box
+                    <IconButton
                         onClick={onAddProject}
+                        size="small"
                         sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            cursor: 'pointer',
-                            color: '#1976d2',
-                            '&:hover': { color: '#1565c0' },
+                            color: 'primary.main',
+                            p: 0.5,
+                            '&:hover': { bgcolor: 'action.hover' },
                         }}
                     >
-                        <AddIcon sx={{ fontSize: 18, mr: 0.5 }} />
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                            Add Project
-                        </Typography>
-                    </Box>
+                        <AddIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
                 </Tooltip>
             </Box>
 
             {/* Projects List */}
             <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
                 {projects.length === 0 ? (
-                    <Box sx={{ p: 2, textAlign: 'center', color: isDark ? '#666' : '#999' }}>
+                    <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
                         <Typography variant="caption">
                             No projects connected
                         </Typography>
@@ -203,12 +229,13 @@ function ProjectSidebar({
                                             px: 1,
                                             py: 0.5,
                                             cursor: 'pointer',
-                                            backgroundColor: isDark ? '#2d2d2d' : '#f5f5f5',
-                                            borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                                            '&:hover': { backgroundColor: isDark ? '#333' : '#eee' },
+                                            bgcolor: 'background.default',
+                                            borderBottom: 1,
+                                            borderColor: 'divider',
+                                            '&:hover': { bgcolor: 'action.hover' },
                                         }}
                                     >
-                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: isDark ? '#aaa' : undefined }}>
+                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: 'text.secondary', cursor: 'pointer' }}>
                                             {isAccountExpanded ? (
                                                 <ExpandMoreIcon sx={{ fontSize: 18 }} />
                                             ) : (
@@ -225,7 +252,7 @@ function ProjectSidebar({
                                             <Typography
                                                 sx={{
                                                     fontSize: '0.75rem',
-                                                    color: account.needsReauth ? '#f44336' : (isDark ? '#ddd' : '#333'),
+                                                    color: account.needsReauth ? 'error.main' : 'text.primary',
                                                     fontWeight: 500,
                                                     overflow: 'hidden',
                                                     textOverflow: 'ellipsis',
@@ -259,7 +286,7 @@ function ProjectSidebar({
                                                 <Typography
                                                     sx={{
                                                         fontSize: '0.65rem',
-                                                        color: isDark ? '#888' : '#666',
+                                                        color: 'text.secondary',
                                                     }}
                                                 >
                                                     {account.projects?.length || 0} project{account.projects?.length !== 1 ? 's' : ''}
@@ -274,9 +301,9 @@ function ProjectSidebar({
                                                 opacity: 0.5,
                                                 '&:hover': {
                                                     opacity: 1,
-                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                                    bgcolor: 'action.hover',
                                                 },
-                                                color: isDark ? '#aaa' : undefined,
+                                                color: 'text.secondary',
                                                 borderRadius: 1,
                                             }}
                                         >
@@ -286,8 +313,12 @@ function ProjectSidebar({
 
                                     {/* Projects under this account */}
                                     <Collapse in={isAccountExpanded}>
-                                        {account.projects?.map((project) => {
-                                            const isProjectExpanded = expandedItems[project.id] !== false;
+                                        {account.projects?.map((project, projectIndex) => {
+                                            // Default: only first project in first account is expanded
+                                            const isFirstProject = googleAccounts.indexOf(account) === 0 && projectIndex === 0;
+                                            const isProjectExpanded = expandedItems[project.id] !== undefined
+                                                ? expandedItems[project.id]
+                                                : isFirstProject;
 
                                             return (
                                                 <Box key={project.id}>
@@ -302,20 +333,20 @@ function ProjectSidebar({
                                                             pr: 1,
                                                             py: 0.4,
                                                             cursor: 'pointer',
-                                                            backgroundColor: selectedProject?.id === project.id
-                                                                ? (isDark ? 'rgba(25, 118, 210, 0.2)' : '#e3f2fd')
+                                                            bgcolor: selectedProject?.id === project.id
+                                                                ? 'action.selected'
                                                                 : 'transparent',
-                                                            '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' },
+                                                            '&:hover': { bgcolor: 'action.hover' },
                                                         }}
                                                     >
-                                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: isDark ? '#aaa' : undefined }}>
+                                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: 'text.secondary', cursor: 'pointer' }}>
                                                             {isProjectExpanded ? (
                                                                 <ExpandMoreIcon sx={{ fontSize: 16 }} />
                                                             ) : (
                                                                 <ChevronRightIcon sx={{ fontSize: 16 }} />
                                                             )}
                                                         </IconButton>
-                                                        <FolderIcon sx={{ fontSize: 14, color: '#ff9800', mr: 0.5 }} />
+                                                        <ProjectIcon sx={{ fontSize: 14, color: 'warning.main', mr: 0.5 }} />
                                                         <Typography
                                                             sx={{
                                                                 fontSize: '0.75rem',
@@ -323,7 +354,7 @@ function ProjectSidebar({
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
                                                                 whiteSpace: 'nowrap',
-                                                                color: isDark ? '#ccc' : '#333',
+                                                                color: 'text.primary',
                                                             }}
                                                         >
                                                             {project.projectId}
@@ -336,9 +367,9 @@ function ProjectSidebar({
                                                                 opacity: 0.5,
                                                                 '&:hover': {
                                                                     opacity: 1,
-                                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                                                    bgcolor: 'action.hover',
                                                                 },
-                                                                color: isDark ? '#aaa' : undefined,
+                                                                color: 'text.secondary',
                                                                 borderRadius: 1,
                                                             }}
                                                         >
@@ -361,22 +392,25 @@ function ProjectSidebar({
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             px: 1,
-                                                                            py: 0.3,
+                                                                            py: 0.5,
                                                                             cursor: 'pointer',
-                                                                            backgroundColor: isMenuTarget ? (isDark ? '#444' : '#e0e0e0') : (isActive ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#bbdefb') : 'transparent'),
-                                                                            borderLeft: isActive ? '2px solid #1976d2' : '2px solid transparent',
-                                                                            '&:hover': { backgroundColor: isActive ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#bbdefb') : (isDark ? '#333' : '#f5f5f5') },
+                                                                            bgcolor: isMenuTarget
+                                                                                ? 'action.hover'
+                                                                                : (isActive ? 'action.selected' : 'transparent'),
+                                                                            borderLeft: isActive ? '2px solid' : '2px solid transparent',
+                                                                            borderColor: isActive ? 'primary.main' : 'transparent',
+                                                                            '&:hover': { bgcolor: isActive ? 'action.selected' : 'action.hover' },
                                                                         }}
                                                                     >
-                                                                        <CollectionIcon sx={{ fontSize: 12, color: isActive ? '#1976d2' : (isDark ? '#888' : '#666'), mr: 0.5 }} />
-                                                                        <Typography sx={{ fontSize: '0.7rem', color: isActive ? '#1976d2' : (isDark ? '#ccc' : '#333'), fontWeight: isActive ? 600 : 400 }}>
+                                                                        <CollectionIcon sx={{ fontSize: 14, color: isActive ? 'primary.main' : 'text.secondary', mr: 0.75 }} />
+                                                                        <Typography sx={{ fontSize: '0.75rem', color: isActive ? 'primary.main' : 'text.primary', fontWeight: isActive ? 600 : 400 }}>
                                                                             {collection}
                                                                         </Typography>
                                                                     </Box>
                                                                 );
                                                             })}
                                                             {(!project.collections || project.collections.length === 0) && (
-                                                                <Typography sx={{ fontSize: '0.7rem', color: isDark ? '#666' : '#999', px: 1, py: 0.3 }}>
+                                                                <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', px: 1, py: 0.3 }}>
                                                                     No collections
                                                                 </Typography>
                                                             )}
@@ -391,14 +425,14 @@ function ProjectSidebar({
                                                                     display: 'flex',
                                                                     alignItems: 'center',
                                                                     px: 1,
-                                                                    py: 0.3,
+                                                                    py: 0.5,
                                                                     cursor: 'pointer',
-                                                                    color: '#1976d2',
-                                                                    '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' },
+                                                                    color: 'primary.main',
+                                                                    '&:hover': { bgcolor: 'action.hover' },
                                                                 }}
                                                             >
-                                                                <AddIcon sx={{ fontSize: 12, mr: 0.5 }} />
-                                                                <Typography sx={{ fontSize: '0.7rem' }}>
+                                                                <AddIcon sx={{ fontSize: 14, mr: 0.75 }} />
+                                                                <Typography sx={{ fontSize: '0.75rem' }}>
                                                                     Add collection
                                                                 </Typography>
                                                             </Box>
@@ -412,17 +446,19 @@ function ProjectSidebar({
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             px: 1,
-                                                                            py: 0.3,
+                                                                            py: 0.5,
                                                                             mt: 0.5,
                                                                             cursor: 'pointer',
-                                                                            borderTop: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                                                                            backgroundColor: isStorageActive ? (isDark ? 'rgba(33, 150, 243, 0.3)' : '#bbdefb') : 'transparent',
-                                                                            borderLeft: isStorageActive ? '2px solid #2196f3' : '2px solid transparent',
-                                                                            '&:hover': { backgroundColor: isStorageActive ? (isDark ? 'rgba(33, 150, 243, 0.3)' : '#bbdefb') : (isDark ? '#333' : '#f5f5f5') },
+                                                                            borderTop: 1,
+                                                                            borderColor: isStorageActive ? 'primary.main' : 'divider',
+                                                                            bgcolor: isStorageActive ? 'action.selected' : 'transparent',
+                                                                            borderLeft: isStorageActive ? '2px solid' : '2px solid transparent',
+                                                                            borderLeftColor: isStorageActive ? 'primary.main' : 'transparent',
+                                                                            '&:hover': { bgcolor: isStorageActive ? 'action.selected' : 'action.hover' },
                                                                         }}
                                                                     >
-                                                                        <StorageIcon sx={{ fontSize: 12, color: '#2196f3', mr: 0.5 }} />
-                                                                        <Typography sx={{ fontSize: '0.7rem', color: isStorageActive ? '#2196f3' : (isDark ? '#ccc' : '#333'), fontWeight: isStorageActive ? 600 : 500 }}>
+                                                                        <StorageIcon sx={{ fontSize: 14, color: 'primary.main', mr: 0.75 }} />
+                                                                        <Typography sx={{ fontSize: '0.75rem', color: isStorageActive ? 'primary.main' : 'text.primary', fontWeight: isStorageActive ? 600 : 500 }}>
                                                                             Storage
                                                                         </Typography>
                                                                     </Box>
@@ -438,15 +474,16 @@ function ProjectSidebar({
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             px: 1,
-                                                                            py: 0.3,
+                                                                            py: 0.5,
                                                                             cursor: 'pointer',
-                                                                            backgroundColor: isAuthActive ? (isDark ? 'rgba(156, 39, 176, 0.3)' : '#e1bee7') : 'transparent',
-                                                                            borderLeft: isAuthActive ? '2px solid #9c27b0' : '2px solid transparent',
-                                                                            '&:hover': { backgroundColor: isAuthActive ? (isDark ? 'rgba(156, 39, 176, 0.3)' : '#e1bee7') : (isDark ? '#333' : '#f5f5f5') },
+                                                                            bgcolor: isAuthActive ? 'action.selected' : 'transparent',
+                                                                            borderLeft: isAuthActive ? '2px solid' : '2px solid transparent',
+                                                                            borderColor: isAuthActive ? 'secondary.main' : 'transparent',
+                                                                            '&:hover': { bgcolor: isAuthActive ? 'action.selected' : 'action.hover' },
                                                                         }}
                                                                     >
-                                                                        <AuthIcon sx={{ fontSize: 12, color: '#9c27b0', mr: 0.5 }} />
-                                                                        <Typography sx={{ fontSize: '0.7rem', color: isAuthActive ? '#9c27b0' : (isDark ? '#ccc' : '#333'), fontWeight: isAuthActive ? 600 : 500 }}>
+                                                                        <AuthIcon sx={{ fontSize: 14, color: 'secondary.main', mr: 0.75 }} />
+                                                                        <Typography sx={{ fontSize: '0.75rem', color: isAuthActive ? 'secondary.main' : 'text.primary', fontWeight: isAuthActive ? 600 : 500 }}>
                                                                             Authentication
                                                                         </Typography>
                                                                     </Box>
@@ -463,8 +500,12 @@ function ProjectSidebar({
                         })}
 
                         {/* Service Account Projects */}
-                        {serviceAccountProjects.map((project) => {
-                            const isExpanded = expandedItems[project.id] !== false;
+                        {serviceAccountProjects.map((project, index) => {
+                            // Service account projects: only first one expanded if no google accounts
+                            const isFirstServiceAccount = googleAccounts.length === 0 && index === 0;
+                            const isExpanded = expandedItems[project.id] !== undefined
+                                ? expandedItems[project.id]
+                                : isFirstServiceAccount;
 
                             return (
                                 <Box key={project.id}>
@@ -478,13 +519,13 @@ function ProjectSidebar({
                                             px: 1,
                                             py: 0.5,
                                             cursor: 'pointer',
-                                            backgroundColor: selectedProject?.id === project.id
-                                                ? (isDark ? 'rgba(25, 118, 210, 0.2)' : '#e3f2fd')
+                                            bgcolor: selectedProject?.id === project.id
+                                                ? 'action.selected'
                                                 : 'transparent',
-                                            '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' },
+                                            '&:hover': { bgcolor: 'action.hover' },
                                         }}
                                     >
-                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: isDark ? '#aaa' : undefined }}>
+                                        <IconButton size="small" sx={{ p: 0, mr: 0.5, color: 'text.secondary', cursor: 'pointer' }}>
                                             {isExpanded ? (
                                                 <ExpandMoreIcon sx={{ fontSize: 18 }} />
                                             ) : (
@@ -504,7 +545,7 @@ function ProjectSidebar({
                                                 overflow: 'hidden',
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap',
-                                                color: isDark ? '#ddd' : 'inherit',
+                                                color: 'text.primary',
                                             }}
                                         >
                                             {project.projectId}
@@ -517,9 +558,9 @@ function ProjectSidebar({
                                                 opacity: 0.5,
                                                 '&:hover': {
                                                     opacity: 1,
-                                                    backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                                    backgroundColor: 'action.hover',
                                                 },
-                                                color: isDark ? '#aaa' : undefined,
+                                                color: 'text.secondary',
                                                 borderRadius: 1,
                                             }}
                                         >
@@ -545,16 +586,17 @@ function ProjectSidebar({
                                                             px: 1,
                                                             py: 0.4,
                                                             cursor: 'pointer',
-                                                            backgroundColor: isMenuTarget ? (isDark ? '#444' : '#e0e0e0') : (isActive ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#bbdefb') : 'transparent'),
-                                                            borderLeft: isActive ? '2px solid #1976d2' : '2px solid transparent',
-                                                            '&:hover': { backgroundColor: isActive ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#bbdefb') : (isDark ? '#333' : '#f5f5f5') },
+                                                            bgcolor: isMenuTarget ? 'action.hover' : (isActive ? 'action.selected' : 'transparent'),
+                                                            borderLeft: isActive ? '2px solid' : '2px solid transparent',
+                                                            borderColor: isActive ? 'primary.main' : 'transparent',
+                                                            '&:hover': { bgcolor: isActive ? 'action.selected' : 'action.hover' },
                                                         }}
                                                     >
-                                                        <CollectionIcon sx={{ fontSize: 14, color: isActive ? '#1976d2' : (isDark ? '#888' : '#666'), mr: 0.5 }} />
+                                                        <CollectionIcon sx={{ fontSize: 14, color: isActive ? 'primary.main' : 'text.secondary', mr: 0.5 }} />
                                                         <Typography
                                                             sx={{
                                                                 fontSize: '0.75rem',
-                                                                color: isActive ? '#1976d2' : (isDark ? '#ccc' : '#333'),
+                                                                color: isActive ? 'primary.main' : 'text.primary',
                                                                 fontWeight: isActive ? 600 : 400,
                                                                 overflow: 'hidden',
                                                                 textOverflow: 'ellipsis',
@@ -567,7 +609,7 @@ function ProjectSidebar({
                                                 );
                                             })}
                                             {(!project.collections || project.collections.length === 0) && (
-                                                <Typography sx={{ fontSize: '0.75rem', color: isDark ? '#666' : '#999', px: 1, py: 0.5 }}>
+                                                <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', px: 1, py: 0.5 }}>
                                                     No collections
                                                 </Typography>
                                             )}
@@ -585,8 +627,8 @@ function ProjectSidebar({
                                                     px: 1,
                                                     py: 0.4,
                                                     cursor: 'pointer',
-                                                    color: '#1976d2',
-                                                    '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' },
+                                                    color: 'primary.main',
+                                                    '&:hover': { bgcolor: 'action.hover' },
                                                 }}
                                             >
                                                 <AddIcon sx={{ fontSize: 14, mr: 0.5 }} />
@@ -605,20 +647,22 @@ function ProjectSidebar({
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             px: 1,
-                                                            py: 0.4,
+                                                            py: 0.5,
                                                             mt: 0.5,
                                                             cursor: 'pointer',
-                                                            borderTop: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                                                            backgroundColor: isStorageActive ? (isDark ? 'rgba(33, 150, 243, 0.3)' : '#bbdefb') : 'transparent',
-                                                            borderLeft: isStorageActive ? '2px solid #2196f3' : '2px solid transparent',
-                                                            '&:hover': { backgroundColor: isStorageActive ? (isDark ? 'rgba(33, 150, 243, 0.3)' : '#bbdefb') : (isDark ? '#333' : '#f5f5f5') },
+                                                            borderTop: 1,
+                                                            borderTopColor: 'divider',
+                                                            bgcolor: isStorageActive ? 'action.selected' : 'transparent',
+                                                            borderLeft: isStorageActive ? '2px solid' : '2px solid transparent',
+                                                            borderLeftColor: isStorageActive ? 'primary.main' : 'transparent',
+                                                            '&:hover': { bgcolor: isStorageActive ? 'action.selected' : 'action.hover' },
                                                         }}
                                                     >
-                                                        <StorageIcon sx={{ fontSize: 14, color: '#2196f3', mr: 0.5 }} />
+                                                        <StorageIcon sx={{ fontSize: 14, color: 'primary.main', mr: 0.75 }} />
                                                         <Typography
                                                             sx={{
                                                                 fontSize: '0.75rem',
-                                                                color: isStorageActive ? '#2196f3' : (isDark ? '#ccc' : '#333'),
+                                                                color: isStorageActive ? 'primary.main' : 'text.primary',
                                                                 fontWeight: isStorageActive ? 600 : 500,
                                                             }}
                                                         >
@@ -638,18 +682,19 @@ function ProjectSidebar({
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             px: 1,
-                                                            py: 0.4,
+                                                            py: 0.5,
                                                             cursor: 'pointer',
-                                                            backgroundColor: isAuthActive ? (isDark ? 'rgba(156, 39, 176, 0.3)' : '#e1bee7') : 'transparent',
-                                                            borderLeft: isAuthActive ? '2px solid #9c27b0' : '2px solid transparent',
-                                                            '&:hover': { backgroundColor: isAuthActive ? (isDark ? 'rgba(156, 39, 176, 0.3)' : '#e1bee7') : (isDark ? '#333' : '#f5f5f5') },
+                                                            bgcolor: isAuthActive ? 'action.selected' : 'transparent',
+                                                            borderLeft: isAuthActive ? '2px solid' : '2px solid transparent',
+                                                            borderColor: isAuthActive ? 'secondary.main' : 'transparent',
+                                                            '&:hover': { bgcolor: isAuthActive ? 'action.selected' : 'action.hover' },
                                                         }}
                                                     >
-                                                        <AuthIcon sx={{ fontSize: 14, color: '#9c27b0', mr: 0.5 }} />
+                                                        <AuthIcon sx={{ fontSize: 14, color: 'secondary.main', mr: 0.75 }} />
                                                         <Typography
                                                             sx={{
                                                                 fontSize: '0.75rem',
-                                                                color: isAuthActive ? '#9c27b0' : (isDark ? '#ccc' : '#333'),
+                                                                color: isAuthActive ? 'secondary.main' : 'text.primary',
                                                                 fontWeight: isAuthActive ? 600 : 500,
                                                             }}
                                                         >
@@ -667,29 +712,86 @@ function ProjectSidebar({
                 )}
             </Box>
 
-            {/* Bottom Icons */}
+            {/* Bottom Toolbar */}
             <Box
                 sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-around',
-                    p: 1,
-                    borderTop: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
+                    justifyContent: 'center',
+                    gap: 0.5,
+                    px: 1.5,
+                    py: 1,
+                    borderTop: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'background.default',
                 }}
             >
+                <Tooltip title="Saved Queries">
+                    <IconButton
+                        size="small"
+                        onClick={onOpenSavedQueries}
+                        sx={{
+                            p: 0.75,
+                            color: 'text.secondary',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                bgcolor: 'action.hover',
+                                color: 'info.main',
+                            },
+                        }}
+                    >
+                        <CodeIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                </Tooltip>
                 <Tooltip title="Favorites">
-                    <IconButton size="small" onClick={onOpenFavorites}>
-                        <StarIcon sx={{ fontSize: 20, color: isDark ? '#888' : '#666' }} />
+                    <IconButton
+                        size="small"
+                        onClick={onOpenFavorites}
+                        sx={{
+                            p: 0.75,
+                            color: 'text.secondary',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                bgcolor: 'action.hover',
+                                color: 'warning.main',
+                            },
+                        }}
+                    >
+                        <StarIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                 </Tooltip>
                 <Tooltip title="Console">
-                    <IconButton size="small" onClick={onOpenConsole}>
-                        <ChatIcon sx={{ fontSize: 20, color: isDark ? '#888' : '#666' }} />
+                    <IconButton
+                        size="small"
+                        onClick={onOpenConsole}
+                        sx={{
+                            p: 0.75,
+                            color: 'text.secondary',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                bgcolor: 'action.hover',
+                                color: 'primary.main',
+                            },
+                        }}
+                    >
+                        <ChatIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                 </Tooltip>
                 <Tooltip title="Settings">
-                    <IconButton size="small" onClick={onOpenSettings}>
-                        <SettingsIcon sx={{ fontSize: 20, color: isDark ? '#888' : '#666' }} />
+                    <IconButton
+                        size="small"
+                        onClick={onOpenSettings}
+                        sx={{
+                            p: 0.75,
+                            color: 'text.secondary',
+                            cursor: 'pointer',
+                            '&:hover': {
+                                bgcolor: 'action.hover',
+                                color: 'text.primary',
+                            },
+                        }}
+                    >
+                        <SettingsIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                 </Tooltip>
             </Box>
@@ -705,22 +807,22 @@ function ProjectSidebar({
                 sx={{
                     '& .MuiMenuItem-root': {
                         '&:hover': {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                            bgcolor: 'action.hover',
                         },
                     },
                     '& .MuiPaper-root': {
-                        backgroundColor: isDark ? '#2d2d2d' : '#fff',
+                        bgcolor: 'background.paper',
                     },
                 }}
             >
                 {menuTarget?.menuType === 'account' ? (
                     // Google Account menu
                     <>
-                        <MenuItem disabled sx={{ opacity: 1 }}>
-                            <Typography variant="caption" sx={{ color: '#888' }}>
+                        <Box sx={{ px: 2, py: 1 }}>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>
                                 {menuTarget?.email}
                             </Typography>
-                        </MenuItem>
+                        </Box>
                         <Divider />
                         <MenuItem onClick={async () => {
                             // Close menu immediately
@@ -786,11 +888,11 @@ function ProjectSidebar({
                 ) : menuTarget?.menuType === 'collection' ? (
                     // Collection menu
                     <>
-                        <MenuItem disabled sx={{ opacity: 1 }}>
-                            <Typography variant="caption" sx={{ color: '#888' }}>
+                        <Box sx={{ px: 2, py: 1 }}>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>
                                 {menuTarget?.collection}
                             </Typography>
-                        </MenuItem>
+                        </Box>
                         <Divider />
                         <MenuItem onClick={() => {
                             onAddDocument?.(menuTarget.project, menuTarget.collection);

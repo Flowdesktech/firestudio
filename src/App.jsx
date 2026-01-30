@@ -31,6 +31,7 @@ import SettingsDialog from './components/SettingsDialog';
 import LogsPanel from './components/LogsPanel';
 import FavoritesPanel from './components/FavoritesPanel';
 import ConsolePanel from './components/ConsolePanel';
+import SavedQueriesPanel from './components/SavedQueriesPanel';
 import { useSettings } from './context/SettingsContext';
 import { useFavorites } from './context/FavoritesContext';
 import { useProjects } from './context/ProjectsContext';
@@ -40,7 +41,6 @@ function App() {
     const { settings } = useSettings();
     const { favorites } = useFavorites();
     const { projects, setProjects, addProject, removeProject, updateProject, isLoading: projectsLoading } = useProjects();
-    const isDark = theme.palette.mode === 'dark';
 
     // Selected project state
     const [selectedProject, setSelectedProject] = useState(null);
@@ -62,6 +62,7 @@ function App() {
     }, []);
     const [favoritesPanelOpen, setFavoritesPanelOpen] = useState(false);
     const [consolePanelOpen, setConsolePanelOpen] = useState(false);
+    const [savedQueriesPanelOpen, setSavedQueriesPanelOpen] = useState(false);
 
     // Add Collection Dialog state
     const [addCollectionDialogOpen, setAddCollectionDialogOpen] = useState(false);
@@ -71,9 +72,35 @@ function App() {
     const [newDocumentData, setNewDocumentData] = useState('{}');
     const [addCollectionLoading, setAddCollectionLoading] = useState(false);
 
-    // Tabs state - multiple open collections
-    const [openTabs, setOpenTabs] = useState([]);
-    const [activeTabId, setActiveTabId] = useState(null);
+    // Tabs state - multiple open collections (persist to localStorage)
+    const [openTabs, setOpenTabs] = useState(() => {
+        try {
+            const saved = localStorage.getItem('firestudio-open-tabs');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [activeTabId, setActiveTabId] = useState(() => {
+        try {
+            return localStorage.getItem('firestudio-active-tab') || null;
+        } catch {
+            return null;
+        }
+    });
+
+    // Save tabs state to localStorage when it changes
+    useEffect(() => {
+        localStorage.setItem('firestudio-open-tabs', JSON.stringify(openTabs));
+    }, [openTabs]);
+
+    useEffect(() => {
+        if (activeTabId) {
+            localStorage.setItem('firestudio-active-tab', activeTabId);
+        } else {
+            localStorage.removeItem('firestudio-active-tab');
+        }
+    }, [activeTabId]);
 
     // UI state
     const [loading, setLoading] = useState(false);
@@ -333,8 +360,22 @@ function App() {
 
     // Open a favorite collection
     const handleOpenFavorite = (favorite) => {
-        // Find the project
-        const project = projects.find(p => p.projectId === favorite.projectId);
+        // Find the project (check both top-level and nested Google account projects)
+        let project = projects.find(p => p.projectId === favorite.projectId && p.authMethod);
+
+        // If not found at top level, search in Google accounts
+        if (!project) {
+            for (const item of projects) {
+                if (item.type === 'googleAccount' && item.projects) {
+                    const googleProject = item.projects.find(p => p.projectId === favorite.projectId);
+                    if (googleProject) {
+                        project = googleProject;
+                        break;
+                    }
+                }
+            }
+        }
+
         if (project) {
             handleOpenCollection(project, favorite.collectionPath);
         } else {
@@ -1003,15 +1044,15 @@ function App() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     height: '100vh',
-                    backgroundColor: theme.palette.background.default,
+                    bgcolor: 'background.default', // Use theme color
                     gap: 2,
                 }}
             >
                 <CircularProgress size={48} />
-                <Typography variant="h6" sx={{ color: isDark ? '#ccc' : '#333' }}>
+                <Typography variant="h6" color="text.primary">
                     Restoring saved projects...
                 </Typography>
-                <Typography variant="body2" sx={{ color: isDark ? '#888' : '#666' }}>
+                <Typography variant="body2" color="text.secondary">
                     Reconnecting to Google accounts and Firebase projects
                 </Typography>
             </Box>
@@ -1019,7 +1060,7 @@ function App() {
     }
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: theme.palette.background.default }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
             {/* Main Content Area */}
             <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
                 {/* Project Sidebar */}
@@ -1051,6 +1092,7 @@ function App() {
                     onOpenSettings={() => setSettingsDialogOpen(true)}
                     onOpenFavorites={() => setFavoritesPanelOpen(true)}
                     onOpenConsole={() => setConsolePanelOpen(true)}
+                    onOpenSavedQueries={() => setSavedQueriesPanelOpen(true)}
                 />
 
                 {/* Main Panel */}
@@ -1060,8 +1102,9 @@ function App() {
                         sx={{
                             display: 'flex',
                             alignItems: 'center',
-                            borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                            backgroundColor: isDark ? '#252526' : '#f5f5f5',
+                            borderBottom: 1,
+                            borderColor: 'divider',
+                            bgcolor: 'background.paper',
                             minHeight: 36,
                         }}
                     >
@@ -1083,18 +1126,20 @@ function App() {
                                         px: 1.5,
                                         py: 0.5,
                                         cursor: 'pointer',
-                                        borderRight: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                                        backgroundColor: activeTabId === tab.id ? (isDark ? '#1e1e1e' : '#fff') : 'transparent',
-                                        borderBottom: activeTabId === tab.id ? '2px solid #1976d2' : '2px solid transparent',
+                                        borderRight: 1,
+                                        borderColor: 'divider',
+                                        bgcolor: activeTabId === tab.id ? 'background.paper' : 'transparent',
+                                        borderBottom: activeTabId === tab.id ? '2px solid' : '2px solid transparent',
+                                        borderBottomColor: activeTabId === tab.id ? 'primary.main' : 'transparent',
                                         '&:hover': {
-                                            backgroundColor: activeTabId === tab.id ? (isDark ? '#1e1e1e' : '#fff') : (isDark ? '#2d2d2d' : '#eee'),
+                                            bgcolor: activeTabId === tab.id ? 'background.paper' : 'action.hover',
                                         },
                                     }}
                                 >
                                     <Typography
                                         sx={{
                                             fontSize: '0.8rem',
-                                            color: isDark ? '#ccc' : '#333',
+                                            color: 'text.primary',
                                             mr: 1,
                                             maxWidth: 120,
                                             overflow: 'hidden',
@@ -1107,7 +1152,7 @@ function App() {
                                     <IconButton
                                         size="small"
                                         onClick={(e) => handleCloseTab(tab.id, e)}
-                                        sx={{ p: 0.25, color: isDark ? '#888' : undefined }}
+                                        sx={{ p: 0.25, color: 'text.secondary' }}
                                     >
                                         <CloseIcon sx={{ fontSize: 14 }} />
                                     </IconButton>
@@ -1159,8 +1204,8 @@ function App() {
                                     justifyContent: 'center',
                                     height: '100%',
                                     flexDirection: 'column',
-                                    color: isDark ? '#888' : '#999',
-                                    backgroundColor: isDark ? '#1e1e1e' : '#fafafa',
+                                    color: 'text.secondary',
+                                    bgcolor: 'background.default',
                                 }}
                             >
                                 <Typography variant="h6" sx={{ mb: 2 }}>
@@ -1214,6 +1259,46 @@ function App() {
                 onClose={() => setConsolePanelOpen(false)}
                 projects={projects}
                 addLog={addLog}
+                allCollections={projects.flatMap(p =>
+                    p.type === 'googleAccount' && p.projects
+                        ? p.projects.flatMap(proj => proj.collections || [])
+                        : (p.collections || [])
+                )}
+            />
+
+            {/* Saved Queries Panel */}
+            <SavedQueriesPanel
+                open={savedQueriesPanelOpen}
+                onClose={() => setSavedQueriesPanelOpen(false)}
+                onOpenQuery={(savedQuery) => {
+                    // Find the project by projectId
+                    let project = null;
+                    for (const item of projects) {
+                        if (item.type === 'googleAccount' && item.projects) {
+                            const googleProject = item.projects.find(p => p.projectId === savedQuery.projectId);
+                            if (googleProject) {
+                                project = googleProject;
+                                break;
+                            }
+                        } else if (item.projectId === savedQuery.projectId) {
+                            project = item;
+                            break;
+                        }
+                    }
+
+                    if (project && savedQuery.collectionPath) {
+                        // Open the collection
+                        handleOpenCollection(project, savedQuery.collectionPath);
+                        // Dispatch event to load the query into the JS editor (wait for component to mount)
+                        setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('load-query', {
+                                detail: { query: savedQuery.code }
+                            }));
+                        }, 300);
+                    } else {
+                        showMessage('Project or collection not found. Please connect the project first.', 'warning');
+                    }
+                }}
             />
 
             {/* Add Collection Dialog */}

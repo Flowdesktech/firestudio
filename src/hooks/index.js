@@ -4,4 +4,5 @@
  */
 
 export { useCollectionData } from './useCollectionData';
-export { useThemeColors } from './useThemeColors';
+export { useAutocomplete } from './useAutocomplete';
+

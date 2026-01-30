@@ -16,9 +16,6 @@ function FilterSortToolbar({
     sortConfig,
     setSortConfig,
     allFields,
-    isDark,
-    borderColor,
-    textColor,
 }) {
     const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
     const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
@@ -47,7 +44,7 @@ function FilterSortToolbar({
     }, [filterMenuOpen, sortMenuOpen]);
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderBottom: `1px solid ${borderColor}`, gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderBottom: 1, borderColor: 'divider', gap: 1 }}>
             {/* Filter Button */}
             <Box sx={{ position: 'relative' }} ref={filterMenuRef}>
                 <Button
@@ -57,7 +54,7 @@ function FilterSortToolbar({
                     sx={{
                         textTransform: 'none',
                         fontSize: '0.75rem',
-                        backgroundColor: filters.length > 0 ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#e3f2fd') : 'transparent',
+                        bgcolor: filters.length > 0 ? 'action.selected' : 'transparent',
                     }}
                 >
                     Filter {filters.length > 0 && `(${filters.length})`}
@@ -69,8 +66,9 @@ function FilterSortToolbar({
                             top: '100%',
                             left: 0,
                             mt: 0.5,
-                            backgroundColor: isDark ? '#2d2d2d' : '#fff',
-                            border: `1px solid ${borderColor}`,
+                            bgcolor: 'background.paper',
+                            border: 1,
+                            borderColor: 'divider',
                             borderRadius: 1,
                             boxShadow: 3,
                             zIndex: 1000,
@@ -78,7 +76,7 @@ function FilterSortToolbar({
                             p: 1.5,
                         }}
                     >
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: textColor }}>Add Filter</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: 'text.primary' }}>Add Filter</Typography>
                         {filters.map((filter, idx) => (
                             <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
                                 <select
@@ -88,7 +86,8 @@ function FilterSortToolbar({
                                         newFilters[idx].field = e.target.value;
                                         setFilters(newFilters);
                                     }}
-                                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', backgroundColor: isDark ? '#1e1e1e' : '#fff', color: textColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}
+                                    className="filter-select"
+                                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
                                 >
                                     <option value="">Select field</option>
                                     {allFields.map(f => <option key={f} value={f}>{f}</option>)}
@@ -100,7 +99,7 @@ function FilterSortToolbar({
                                         newFilters[idx].operator = e.target.value;
                                         setFilters(newFilters);
                                     }}
-                                    style={{ width: 70, padding: '4px 8px', fontSize: '0.8rem', backgroundColor: isDark ? '#1e1e1e' : '#fff', color: textColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}
+                                    style={{ width: 70, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
                                 >
                                     <option value="==">==</option>
                                     <option value="!=">!=</option>
@@ -117,7 +116,7 @@ function FilterSortToolbar({
                                         setFilters(newFilters);
                                     }}
                                     placeholder="Value"
-                                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', backgroundColor: isDark ? '#1e1e1e' : '#fff', color: textColor, border: `1px solid ${borderColor}`, borderRadius: 4 }}
+                                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
                                 />
                                 <IconButton size="small" onClick={() => setFilters(filters.filter((_, i) => i !== idx))}>×</IconButton>
                             </Box>
@@ -143,7 +142,7 @@ function FilterSortToolbar({
                     sx={{
                         textTransform: 'none',
                         fontSize: '0.75rem',
-                        backgroundColor: sortConfig.field ? (isDark ? 'rgba(25, 118, 210, 0.3)' : '#e3f2fd') : 'transparent',
+                        bgcolor: sortConfig.field ? 'action.selected' : 'transparent',
                     }}
                 >
                     Sort {sortConfig.field && `(${sortConfig.field} ${sortConfig.direction === 'asc' ? '↑' : '↓'})`}
@@ -155,8 +154,9 @@ function FilterSortToolbar({
                             top: '100%',
                             left: 0,
                             mt: 0.5,
-                            backgroundColor: isDark ? '#2d2d2d' : '#fff',
-                            border: `1px solid ${borderColor}`,
+                            bgcolor: 'background.paper',
+                            border: 1,
+                            borderColor: 'divider',
                             borderRadius: 1,
                             boxShadow: 3,
                             zIndex: 1000,
@@ -164,11 +164,11 @@ function FilterSortToolbar({
                             p: 1,
                         }}
                     >
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: textColor }}>Sort By</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: 'text.primary' }}>Sort By</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 200, overflow: 'auto' }}>
                             <Box
                                 onClick={() => { setSortConfig({ field: '', direction: 'asc' }); setSortMenuOpen(false); }}
-                                sx={{ px: 1, py: 0.5, cursor: 'pointer', borderRadius: 0.5, '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' }, color: !sortConfig.field ? '#1976d2' : textColor }}
+                                sx={{ px: 1, py: 0.5, cursor: 'pointer', borderRadius: 0.5, '&:hover': { bgcolor: 'action.hover' }, color: !sortConfig.field ? 'primary.main' : 'text.primary' }}
                             >
                                 None
                             </Box>
@@ -190,8 +190,8 @@ function FilterSortToolbar({
                                         borderRadius: 0.5,
                                         display: 'flex',
                                         justifyContent: 'space-between',
-                                        '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' },
-                                        color: sortConfig.field === f ? '#1976d2' : textColor,
+                                        '&:hover': { bgcolor: 'action.hover' },
+                                        color: sortConfig.field === f ? 'primary.main' : 'text.primary',
                                         fontWeight: sortConfig.field === f ? 600 : 400,
                                     }}
                                 >

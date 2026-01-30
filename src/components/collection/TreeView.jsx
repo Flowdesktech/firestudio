@@ -10,6 +10,8 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    useTheme,
+    alpha
 } from '@mui/material';
 import {
     ExpandMore as ExpandMoreIcon,
@@ -32,13 +34,9 @@ function TreeView({
     getType,
     getTypeColor,
     formatValue,
-    isDark,
-    borderColor,
-    bgColor,
-    textColor,
-    mutedColor,
-    hoverBg,
 }) {
+    const theme = useTheme();
+
     // Tree View Row Component
     const TreeRow = ({ nodeKey, value, path, docId, depth = 0, isDoc = false, isCollection = false }) => {
         const nodeType = isCollection ? 'Collection' : isDoc ? 'Document' : getType(value);
@@ -49,20 +47,21 @@ function TreeView({
 
         return (
             <>
-                <TableRow sx={{ '&:hover': { backgroundColor: hoverBg } }}>
+                <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                     <TableCell
                         sx={{
                             py: 0.25,
                             pl: depth * 2 + 1,
-                            borderBottom: `1px solid ${borderColor}`,
+                            borderBottom: 1,
+                            borderColor: 'divider',
                             cursor: isExpandable ? 'pointer' : 'default',
-                            color: textColor,
+                            color: 'text.primary',
                         }}
                         onClick={() => isExpandable && toggleNode(path)}
                     >
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             {isExpandable ? (
-                                <IconButton size="small" sx={{ p: 0, mr: 0.5, color: mutedColor }}>
+                                <IconButton size="small" sx={{ p: 0, mr: 0.5, color: 'text.secondary' }}>
                                     {isExpanded ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : <ChevronRightIcon sx={{ fontSize: 16 }} />}
                                 </IconButton>
                             ) : (
@@ -70,10 +69,10 @@ function TreeView({
                             )}
                             {isCollection && <CollectionIcon sx={{ fontSize: 14, color: '#1976d2', mr: 0.5 }} />}
                             {isDoc && <DocumentIcon sx={{ fontSize: 14, color: '#ff9800', mr: 0.5 }} />}
-                            <Typography sx={{ fontSize: '0.8rem', color: textColor }}>{nodeKey}</Typography>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{nodeKey}</Typography>
                         </Box>
                     </TableCell>
-                    <TableCell sx={{ py: 0.25, borderBottom: `1px solid ${borderColor}` }}>
+                    <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
                         {!isCollection && !isDoc && !isExpandable ? (
                             isEditing ? (
                                 <TextField
@@ -92,7 +91,7 @@ function TreeView({
                                         fontSize: '0.8rem',
                                         color: getTypeColor(nodeType),
                                         cursor: 'pointer',
-                                        '&:hover': { backgroundColor: isDark ? 'rgba(25, 118, 210, 0.2)' : '#e3f2fd', borderRadius: 0.5 },
+                                        '&:hover': { bgcolor: 'action.hover', borderRadius: 0.5 },
                                         p: 0.5,
                                     }}
                                 >
@@ -100,10 +99,10 @@ function TreeView({
                                 </Typography>
                             )
                         ) : (
-                            <Typography sx={{ fontSize: '0.8rem', color: textColor }}>{displayValue}</Typography>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{displayValue}</Typography>
                         )}
                     </TableCell>
-                    <TableCell sx={{ py: 0.25, borderBottom: `1px solid ${borderColor}` }}>
+                    <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
                         <Typography sx={{ fontSize: '0.75rem', color: getTypeColor(nodeType) }}>{nodeType}</Typography>
                     </TableCell>
                 </TableRow>
@@ -126,9 +125,9 @@ function TreeView({
             <Table size="small" stickyHeader>
                 <TableHead>
                     <TableRow>
-                        <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, width: '40%', color: textColor }}>Key</TableCell>
-                        <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, width: '40%', color: textColor }}>Value</TableCell>
-                        <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, width: '20%', color: textColor }}>Type</TableCell>
+                        <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '40%', color: 'text.primary' }}>Key</TableCell>
+                        <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '40%', color: 'text.primary' }}>Value</TableCell>
+                        <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '20%', color: 'text.primary' }}>Type</TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>

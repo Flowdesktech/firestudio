@@ -9,7 +9,6 @@ import {
     ListItemIcon,
     ListItemText,
     Drawer,
-    useTheme,
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -21,8 +20,6 @@ import {
 import { useFavorites } from '../context/FavoritesContext';
 
 function FavoritesPanel({ open, onClose, onOpenFavorite }) {
-    const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
     const { favorites, removeFavorite } = useFavorites();
 
     return (
@@ -33,7 +30,7 @@ function FavoritesPanel({ open, onClose, onOpenFavorite }) {
             sx={{
                 '& .MuiDrawer-paper': {
                     width: 300,
-                    backgroundColor: isDark ? '#252526' : '#fff',
+                    bgcolor: 'background.paper',
                 },
             }}
         >
@@ -45,7 +42,8 @@ function FavoritesPanel({ open, onClose, onOpenFavorite }) {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         p: 2,
-                        borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
+                        borderBottom: 1,
+                        borderColor: 'divider',
                     }}
                 >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -62,7 +60,7 @@ function FavoritesPanel({ open, onClose, onOpenFavorite }) {
                 {/* Favorites List */}
                 <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
                     {favorites.length === 0 ? (
-                        <Box sx={{ p: 3, textAlign: 'center', color: isDark ? '#888' : '#999' }}>
+                        <Box sx={{ p: 3, textAlign: 'center', color: 'text.disabled' }}>
                             <StarBorderIcon sx={{ fontSize: 48, mb: 1, opacity: 0.5 }} />
                             <Typography variant="body2">
                                 No favorites yet
@@ -81,7 +79,7 @@ function FavoritesPanel({ open, onClose, onOpenFavorite }) {
                                             edge="end"
                                             size="small"
                                             onClick={() => removeFavorite(fav.id)}
-                                            sx={{ color: isDark ? '#888' : '#666' }}
+                                            sx={{ color: 'text.secondary' }}
                                         >
                                             <DeleteIcon fontSize="small" />
                                         </IconButton>
@@ -95,7 +93,7 @@ function FavoritesPanel({ open, onClose, onOpenFavorite }) {
                                         }}
                                     >
                                         <ListItemIcon sx={{ minWidth: 36 }}>
-                                            <CollectionIcon sx={{ fontSize: 18, color: isDark ? '#888' : '#666' }} />
+                                            <CollectionIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                                         </ListItemIcon>
                                         <ListItemText
                                             primary={fav.collectionPath}

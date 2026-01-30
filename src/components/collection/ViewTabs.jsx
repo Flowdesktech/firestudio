@@ -33,10 +33,6 @@ function ViewTabs({
     visibleFields,
     hiddenColumns,
     setHiddenColumns,
-    isDark,
-    borderColor,
-    textColor,
-    mutedColor,
     selectedRowsCount = 0,
 }) {
     const [columnsMenuAnchor, setColumnsMenuAnchor] = React.useState(null);
@@ -60,14 +56,14 @@ function ViewTabs({
     }, [columnsMenuAnchor]);
 
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid ${borderColor}` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', borderBottom: 1, borderColor: 'divider' }}>
             <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} size="small" sx={{ m: 0.5 }}>
                 <ToggleButton value="table" sx={{ textTransform: 'none', px: 1 }}><TableIcon sx={{ fontSize: 16, mr: 0.5 }} />Table</ToggleButton>
                 <ToggleButton value="tree" sx={{ textTransform: 'none', px: 1 }}><TreeIcon sx={{ fontSize: 16, mr: 0.5 }} />Tree</ToggleButton>
                 <ToggleButton value="json" sx={{ textTransform: 'none', px: 1 }}><JsonIcon sx={{ fontSize: 16, mr: 0.5 }} />JSON</ToggleButton>
             </ToggleButtonGroup>
             <Box sx={{ flexGrow: 1 }} />
-            <Typography sx={{ fontSize: '0.75rem', color: mutedColor, mr: 1 }}>{documentsCount} doc{documentsCount !== 1 ? 's' : ''}</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mr: 1 }}>{documentsCount} doc{documentsCount !== 1 ? 's' : ''}</Typography>
             {viewMode === 'table' && (
                 <Box sx={{ position: 'relative' }} ref={columnsMenuRef}>
                     <Tooltip title="Show/Hide Columns">
@@ -87,8 +83,9 @@ function ViewTabs({
                                 top: '100%',
                                 right: 0,
                                 mt: 0.5,
-                                backgroundColor: isDark ? '#2d2d2d' : '#fff',
-                                border: `1px solid ${borderColor}`,
+                                bgcolor: 'background.paper',
+                                border: 1,
+                                borderColor: 'divider',
                                 borderRadius: 1,
                                 boxShadow: 3,
                                 zIndex: 1000,
@@ -98,7 +95,7 @@ function ViewTabs({
                                 p: 1,
                             }}
                         >
-                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 1, color: mutedColor }}>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 1, color: 'text.secondary' }}>
                                 Toggle Columns ({visibleFields.length}/{allFields.length})
                             </Typography>
                             {allFields.map(field => (
@@ -112,7 +109,7 @@ function ViewTabs({
                                         px: 0.5,
                                         borderRadius: 0.5,
                                         cursor: 'pointer',
-                                        '&:hover': { backgroundColor: isDark ? '#333' : '#f5f5f5' }
+                                        '&:hover': { bgcolor: 'action.hover' }
                                     }}
                                     onClick={() => setHiddenColumns(prev => ({ ...prev, [field]: !prev[field] }))}
                                 >
@@ -122,11 +119,11 @@ function ViewTabs({
                                         onChange={() => setHiddenColumns(prev => ({ ...prev, [field]: !prev[field] }))}
                                         style={{ cursor: 'pointer' }}
                                     />
-                                    <Typography sx={{ fontSize: '0.8rem', color: textColor }}>{field}</Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{field}</Typography>
                                 </Box>
                             ))}
                             {allFields.length === 0 && (
-                                <Typography sx={{ fontSize: '0.75rem', color: mutedColor }}>No columns</Typography>
+                                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>No columns</Typography>
                             )}
                         </Box>
                     )}

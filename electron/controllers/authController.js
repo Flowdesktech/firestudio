@@ -1,11 +1,10 @@
 /**
  * Auth Controller
- * Handles Firebase Authentication user management via IPC (both Admin SDK and Google OAuth)
+ * Handles Firebase Authentication user management via IPC (Admin SDK only)
+ * Note: Google OAuth auth operations are handled by googleController.js
  */
 
 const { ipcMain } = require('electron');
-const fetch = require('node-fetch');
-const googleController = require('./googleController');
 
 let adminRef = null;
 
@@ -86,75 +85,6 @@ function registerHandlers() {
         } catch (error) { return { success: false, error: error.message }; }
     });
 
-    // ===== Google OAuth Auth Operations =====
-
-    ipcMain.handle('google:listAuthUsers', async (event, { projectId, maxResults = 1000 }) => {
-        try {
-            const accessToken = googleController.getAccessToken();
-            if (!accessToken) return { success: false, error: 'Not signed in' };
-            const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:batchGet`;
-            const response = await fetch(url, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ maxResults })
-            });
-            const data = await response.json();
-            if (data.error) return { success: false, error: data.error.message };
-            const users = (data.users || []).map(user => ({
-                uid: user.localId, email: user.email || null, emailVerified: user.emailVerified || false,
-                displayName: user.displayName || null, photoURL: user.photoUrl || null, phoneNumber: user.phoneNumber || null, disabled: user.disabled || false,
-                metadata: { creationTime: user.createdAt ? new Date(parseInt(user.createdAt)).toISOString() : null, lastSignInTime: user.lastLoginAt ? new Date(parseInt(user.lastLoginAt)).toISOString() : null },
-                providerData: (user.providerUserInfo || []).map(p => ({ providerId: p.providerId, uid: p.rawId, email: p.email, displayName: p.displayName, photoURL: p.photoUrl, phoneNumber: p.phoneNumber }))
-            }));
-            return { success: true, users };
-        } catch (error) { return { success: false, error: error.message }; }
-    });
-
-    ipcMain.handle('google:createAuthUser', async (event, { projectId, email, password, displayName }) => {
-        try {
-            const accessToken = googleController.getAccessToken();
-            if (!accessToken) return { success: false, error: 'Not signed in' };
-            const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts`;
-            const response = await fetch(url, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, displayName: displayName || undefined })
-            });
-            const data = await response.json();
-            if (data.error) return { success: false, error: data.error.message };
-            return { success: true, user: { uid: data.localId, email: data.email, displayName: data.displayName } };
-        } catch (error) { return { success: false, error: error.message }; }
-    });
-
-    ipcMain.handle('google:updateAuthUser', async (event, { projectId, uid, email, password, displayName, disabled }) => {
-        try {
-            const accessToken = googleController.getAccessToken();
-            if (!accessToken) return { success: false, error: 'Not signed in' };
-            const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:update`;
-            const updateData = { localId: uid };
-            if (email !== undefined) updateData.email = email;
-            if (password !== undefined) updateData.password = password;
-            if (displayName !== undefined) updateData.displayName = displayName;
-            if (disabled !== undefined) updateData.disableUser = disabled;
-            const response = await fetch(url, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(updateData)
-            });
-            const data = await response.json();
-            if (data.error) return { success: false, error: data.error.message };
-            return { success: true, user: { uid: data.localId, email: data.email, displayName: data.displayName, disabled: data.disabled } };
-        } catch (error) { return { success: false, error: error.message }; }
-    });
-
-    ipcMain.handle('google:deleteAuthUser', async (event, { projectId, uid }) => {
-        try {
-            const accessToken = googleController.getAccessToken();
-            if (!accessToken) return { success: false, error: 'Not signed in' };
-            const url = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:delete`;
-            const response = await fetch(url, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ localId: uid })
-            });
-            const data = await response.json();
-            if (data.error) return { success: false, error: data.error.message };
-            return { success: true };
-        } catch (error) { return { success: false, error: error.message }; }
-    });
 }
 
 module.exports = { registerHandlers, setAdminRef };

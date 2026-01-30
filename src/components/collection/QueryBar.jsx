@@ -25,12 +25,10 @@ function QueryBar({
     onRunQuery,
     limit,
     setLimit,
-    isDark,
-    borderColor,
-    bgColor,
 }) {
+    // const theme = useTheme(); // If complex logic needed, but here we use system props
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: `1px solid ${borderColor}`, gap: 1, backgroundColor: bgColor }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: 1, borderColor: 'divider', gap: 1, bgcolor: 'background.default' }}>
             <ToggleButtonGroup value={queryMode} exclusive onChange={(_, v) => v && setQueryMode(v)} size="small">
                 <ToggleButton value="simple" sx={{ textTransform: 'none', px: 1.5 }}>
                     <FilterIcon sx={{ fontSize: 16, mr: 0.5 }} /> Simple
@@ -40,7 +38,7 @@ function QueryBar({
                 </ToggleButton>
             </ToggleButtonGroup>
 
-            <Chip label={project?.projectId} size="small" sx={{ backgroundColor: isDark ? 'rgba(25, 118, 210, 0.3)' : '#e3f2fd', ml: 1 }} />
+            <Chip label={project?.projectId} size="small" sx={{ bgcolor: 'action.selected', ml: 1 }} />
 
             <Box sx={{ flexGrow: 1 }} />
 

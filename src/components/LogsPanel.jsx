@@ -7,6 +7,7 @@ import {
     Chip,
     Collapse,
     useTheme,
+    alpha,
 } from '@mui/material';
 import {
     Terminal as TerminalIcon,
@@ -21,7 +22,6 @@ import {
 
 function LogsPanel({ logs, onClear }) {
     const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
     const [expanded, setExpanded] = useState(true);
     const logsEndRef = useRef(null);
 
@@ -34,26 +34,26 @@ function LogsPanel({ logs, onClear }) {
     const getLogIcon = (type) => {
         switch (type) {
             case 'success':
-                return <SuccessIcon sx={{ fontSize: 14, color: '#4caf50' }} />;
+                return <SuccessIcon sx={{ fontSize: 14, color: 'success.main' }} />;
             case 'error':
-                return <ErrorIcon sx={{ fontSize: 14, color: '#f44336' }} />;
+                return <ErrorIcon sx={{ fontSize: 14, color: 'error.main' }} />;
             case 'warning':
-                return <WarningIcon sx={{ fontSize: 14, color: '#ff9800' }} />;
+                return <WarningIcon sx={{ fontSize: 14, color: 'warning.main' }} />;
             default:
-                return <InfoIcon sx={{ fontSize: 14, color: '#2196f3' }} />;
+                return <InfoIcon sx={{ fontSize: 14, color: 'info.main' }} />;
         }
     };
 
     const getLogColor = (type) => {
         switch (type) {
             case 'success':
-                return '#4caf50';
+                return 'success.main';
             case 'error':
-                return '#f44336';
+                return 'error.main';
             case 'warning':
-                return '#ff9800';
+                return 'warning.main';
             default:
-                return '#2196f3';
+                return 'info.main';
         }
     };
 
@@ -70,8 +70,9 @@ function LogsPanel({ logs, onClear }) {
     return (
         <Box
             sx={{
-                borderTop: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
-                backgroundColor: isDark ? '#1e1e1e' : '#fafafa',
+                borderTop: 1,
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
                 maxHeight: expanded ? 200 : 36,
                 transition: 'max-height 0.3s ease',
                 display: 'flex',
@@ -86,17 +87,18 @@ function LogsPanel({ logs, onClear }) {
                     justifyContent: 'space-between',
                     px: 2,
                     py: 0.5,
-                    borderBottom: expanded ? `1px solid ${isDark ? '#333' : '#e0e0e0'}` : 'none',
+                    borderBottom: expanded ? 1 : 0,
+                    borderColor: 'divider',
                     cursor: 'pointer',
                     '&:hover': {
-                        backgroundColor: isDark ? '#252526' : '#f0f0f0',
+                        backgroundColor: 'action.hover',
                     },
                 }}
                 onClick={() => setExpanded(!expanded)}
             >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TerminalIcon sx={{ fontSize: 16, color: isDark ? '#888' : '#666' }} />
-                    <Typography variant="caption" sx={{ color: isDark ? '#ccc' : '#333', fontWeight: 600 }}>
+                    <TerminalIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 600 }}>
                         LOGS
                     </Typography>
                     {logs.length > 0 && (
@@ -106,8 +108,8 @@ function LogsPanel({ logs, onClear }) {
                             sx={{
                                 height: 16,
                                 fontSize: '0.65rem',
-                                backgroundColor: isDark ? 'rgba(33, 150, 243, 0.3)' : 'rgba(33, 150, 243, 0.2)',
-                                color: '#2196f3',
+                                bgcolor: (theme) => alpha(theme.palette.info.main, 0.2),
+                                color: 'info.main',
                             }}
                         />
                     )}
@@ -121,16 +123,16 @@ function LogsPanel({ logs, onClear }) {
                                     e.stopPropagation();
                                     onClear();
                                 }}
-                                sx={{ color: isDark ? '#888' : '#666', mr: 0.5 }}
+                                sx={{ color: 'text.secondary', mr: 0.5 }}
                             >
                                 <ClearIcon sx={{ fontSize: 14 }} />
                             </IconButton>
                         </Tooltip>
                     )}
                     {expanded ? (
-                        <ExpandMoreIcon sx={{ fontSize: 16, color: isDark ? '#888' : '#666' }} />
+                        <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                     ) : (
-                        <ExpandLessIcon sx={{ fontSize: 16, color: isDark ? '#888' : '#666' }} />
+                        <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                     )}
                 </Box>
             </Box>
@@ -147,7 +149,7 @@ function LogsPanel({ logs, onClear }) {
                     }}
                 >
                     {logs.length === 0 ? (
-                        <Box sx={{ p: 2, textAlign: 'center', color: isDark ? '#666' : '#555' }}>
+                        <Box sx={{ p: 2, textAlign: 'center', color: 'text.disabled' }}>
                             <Typography variant="caption">No logs yet</Typography>
                         </Box>
                     ) : (
@@ -159,15 +161,16 @@ function LogsPanel({ logs, onClear }) {
                                     alignItems: 'flex-start',
                                     px: 2,
                                     py: 0.5,
-                                    borderBottom: `1px solid ${isDark ? '#2d2d2d' : '#eee'}`,
+                                    borderBottom: 1,
+                                    borderColor: 'divider',
                                     '&:hover': {
-                                        backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+                                        bgcolor: 'action.hover',
                                     },
                                 }}
                             >
                                 <Typography
                                     sx={{
-                                        color: isDark ? '#666' : '#555',
+                                        color: 'text.secondary',
                                         fontSize: '0.7rem',
                                         width: 85,
                                         flexShrink: 0,
@@ -192,7 +195,7 @@ function LogsPanel({ logs, onClear }) {
                                 {log.details && (
                                     <Typography
                                         sx={{
-                                            color: isDark ? '#888' : '#666',
+                                            color: 'text.secondary',
                                             fontSize: '0.7rem',
                                             fontFamily: 'monospace',
                                             ml: 1,

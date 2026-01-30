@@ -3,7 +3,7 @@ import {
     Box, Typography, IconButton, Tooltip, Button, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, CircularProgress, Breadcrumbs, Link,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField, Menu, MenuItem,
-    ListItemIcon, Divider, Chip, FormControl, InputLabel, Select,
+    ListItemIcon, Divider, Chip, FormControl, InputLabel, Select, useTheme,
 } from '@mui/material';
 import {
     Folder as FolderIcon, InsertDriveFile as FileIcon, CloudUpload as UploadIcon,
@@ -14,11 +14,10 @@ import {
     Description as DocIcon, Code as CodeIcon, Archive as ArchiveIcon,
     OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
-import { useThemeColors } from '../hooks';
 import { formatFileSize, formatDate, copyToClipboard, confirmAction } from '../utils/commonUtils';
 
 // File icon component
-const FileTypeIcon = ({ item, mutedColor }) => {
+const FileTypeIcon = ({ item }) => {
     if (item.type === 'folder') return <FolderIcon sx={{ color: '#ffc107' }} />;
     const ct = item.contentType || '';
     if (ct.startsWith('image/')) return <ImageIcon sx={{ color: '#4caf50' }} />;
@@ -27,7 +26,7 @@ const FileTypeIcon = ({ item, mutedColor }) => {
     if (ct.includes('pdf') || ct.includes('document')) return <DocIcon sx={{ color: '#ff9800' }} />;
     if (ct.includes('zip') || ct.includes('archive')) return <ArchiveIcon sx={{ color: '#795548' }} />;
     if (ct.includes('json') || ct.includes('javascript') || ct.includes('text')) return <CodeIcon sx={{ color: '#2196f3' }} />;
-    return <FileIcon sx={{ color: mutedColor }} />;
+    return <FileIcon sx={{ color: 'text.secondary' }} />;
 };
 
 // Expiration options for signed URLs
@@ -43,7 +42,7 @@ const EXPIRATION_OPTIONS = [
 ];
 
 function StorageTab({ project, addLog, showMessage }) {
-    const { isDark, borderColor, bgColor, hoverBg, textColor, mutedColor, selectedBg, chipBg } = useThemeColors();
+    const theme = useTheme();
 
     const [currentPath, setCurrentPath] = useState('');
     const [items, setItems] = useState([]);
@@ -178,7 +177,7 @@ function StorageTab({ project, addLog, showMessage }) {
         const confirmed = await confirmAction(
             'Delete File?',
             `Are you sure you want to delete <strong>"${item.name}"</strong>?<br><small style="color: #888;">This action cannot be undone.</small>`,
-            { confirmText: 'Delete', isDark }
+            { confirmText: 'Delete', isDark: theme.palette.mode === 'dark' }
         );
 
         if (confirmed) {
@@ -216,10 +215,10 @@ function StorageTab({ project, addLog, showMessage }) {
     const pathParts = currentPath.split('/').filter(Boolean);
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: bgColor }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: 'background.default' }}>
             {/* Toolbar */}
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: `1px solid ${borderColor}`, gap: 1 }}>
-                <Chip label={project?.projectId} size="small" sx={{ backgroundColor: chipBg }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: 1, borderColor: 'divider', gap: 1 }}>
+                <Chip label={project?.projectId} size="small" sx={{ bgcolor: 'action.selected' }} />
                 <Box sx={{ flexGrow: 1 }} />
                 <Tooltip title="New Folder"><IconButton size="small" onClick={() => setCreateFolderOpen(true)}><NewFolderIcon sx={{ fontSize: 20 }} /></IconButton></Tooltip>
                 <Tooltip title="Upload File"><IconButton size="small" onClick={handleUpload}><UploadIcon sx={{ fontSize: 20 }} /></IconButton></Tooltip>
@@ -227,13 +226,13 @@ function StorageTab({ project, addLog, showMessage }) {
             </Box>
 
             {/* Breadcrumbs */}
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: `1px solid ${borderColor}` }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: 1, borderColor: 'divider' }}>
                 <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} sx={{ fontSize: '0.85rem' }}>
-                    <Link component="button" underline="hover" onClick={() => setCurrentPath('')} sx={{ display: 'flex', alignItems: 'center', color: textColor, cursor: 'pointer' }}>
+                    <Link component="button" underline="hover" onClick={() => setCurrentPath('')} sx={{ display: 'flex', alignItems: 'center', color: 'text.primary', cursor: 'pointer' }}>
                         <HomeIcon sx={{ mr: 0.5, fontSize: 18 }} />Storage
                     </Link>
                     {pathParts.map((part, i) => (
-                        <Link key={i} component="button" underline="hover" onClick={() => navigateToBreadcrumb(i)} sx={{ color: i === pathParts.length - 1 ? 'primary.main' : textColor, cursor: 'pointer' }}>{part}</Link>
+                        <Link key={i} component="button" underline="hover" onClick={() => navigateToBreadcrumb(i)} sx={{ color: i === pathParts.length - 1 ? 'primary.main' : 'text.primary', cursor: 'pointer' }}>{part}</Link>
                     ))}
                 </Breadcrumbs>
             </Box>
@@ -243,9 +242,9 @@ function StorageTab({ project, addLog, showMessage }) {
                 {loading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box>
                 ) : bucketError ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: mutedColor, p: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'text.secondary', p: 4 }}>
                         <FolderIcon sx={{ fontSize: 64, opacity: 0.3, mb: 2, color: '#f44336' }} />
-                        <Typography variant="h6" sx={{ mb: 1, color: textColor }}>Storage Not Enabled</Typography>
+                        <Typography variant="h6" sx={{ mb: 1, color: 'text.primary' }}>Storage Not Enabled</Typography>
                         <Typography sx={{ textAlign: 'center', maxWidth: 450, mb: 3 }}>
                             Firebase Storage is not enabled for this project. Enable it in the Firebase Console to start uploading files.
                         </Typography>
@@ -257,7 +256,7 @@ function StorageTab({ project, addLog, showMessage }) {
                         >
                             Open Firebase Console
                         </Button>
-                        <Typography variant="caption" sx={{ mt: 2, color: mutedColor }}>
+                        <Typography variant="caption" sx={{ mt: 2, color: 'text.secondary' }}>
                             After enabling Storage, click Refresh to reload.
                         </Typography>
                         <Button variant="text" size="small" onClick={loadFiles} sx={{ mt: 1 }}>
@@ -265,7 +264,7 @@ function StorageTab({ project, addLog, showMessage }) {
                         </Button>
                     </Box>
                 ) : items.length === 0 ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: mutedColor }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'text.secondary' }}>
                         <FolderIcon sx={{ fontSize: 64, opacity: 0.3, mb: 2 }} />
                         <Typography>No files in this folder</Typography>
                         <Button variant="outlined" size="small" startIcon={<UploadIcon />} onClick={handleUpload} sx={{ mt: 2 }}>Upload File</Button>
@@ -275,27 +274,27 @@ function StorageTab({ project, addLog, showMessage }) {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor }}>Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 100 }}>Size</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 150 }}>Type</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 120 }}>Modified</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 50 }}></TableCell>
+                                    <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary' }}>Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary', width: 100 }}>Size</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary', width: 150 }}>Type</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary', width: 120 }}>Modified</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary', width: 50 }}></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {items.map((item, i) => (
                                     <TableRow key={item.path || i} onClick={() => handleItemClick(item)}
-                                        sx={{ cursor: 'pointer', '&:hover': { backgroundColor: hoverBg }, backgroundColor: selectedItem?.path === item.path ? selectedBg : 'transparent' }}>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}>
+                                        sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' }, bgcolor: selectedItem?.path === item.path ? 'action.selected' : 'transparent' }}>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <FileTypeIcon item={item} mutedColor={mutedColor} />
-                                                <Typography sx={{ fontSize: '0.85rem', color: textColor }}>{item.name}</Typography>
+                                                <FileTypeIcon item={item} />
+                                                <Typography sx={{ fontSize: '0.85rem', color: 'text.primary' }}>{item.name}</Typography>
                                             </Box>
                                         </TableCell>
-                                        <TableCell sx={{ fontSize: '0.8rem', color: mutedColor, borderBottom: `1px solid ${borderColor}` }}>{item.size === 0 ? '—' : formatFileSize(item.size)}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.8rem', color: mutedColor, borderBottom: `1px solid ${borderColor}` }}>{item.type === 'folder' ? 'Folder' : (item.contentType || '—')}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.8rem', color: mutedColor, borderBottom: `1px solid ${borderColor}` }}>{item.updated ? new Date(item.updated).toLocaleDateString() : '—'}</TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}>
+                                        <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary', borderBottom: 1, borderColor: 'divider' }}>{item.size === 0 ? '—' : formatFileSize(item.size)}</TableCell>
+                                        <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary', borderBottom: 1, borderColor: 'divider' }}>{item.type === 'folder' ? 'Folder' : (item.contentType || '—')}</TableCell>
+                                        <TableCell sx={{ fontSize: '0.8rem', color: 'text.secondary', borderBottom: 1, borderColor: 'divider' }}>{item.updated ? new Date(item.updated).toLocaleDateString() : '—'}</TableCell>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                             {item.type === 'file' && <IconButton size="small" onClick={(e) => handleContextMenu(e, item)}><MoreVertIcon sx={{ fontSize: 16 }} /></IconButton>}
                                         </TableCell>
                                     </TableRow>
@@ -307,7 +306,7 @@ function StorageTab({ project, addLog, showMessage }) {
             </Box>
 
             {/* Status Bar */}
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderTop: `1px solid ${borderColor}`, fontSize: '0.75rem', color: mutedColor }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderTop: 1, borderColor: 'divider', fontSize: '0.75rem', color: 'text.secondary' }}>
                 <Typography variant="caption">{items.length} item{items.length !== 1 ? 's' : ''}{items.filter(i => i.type === 'folder').length > 0 && ` (${items.filter(i => i.type === 'folder').length} folder${items.filter(i => i.type === 'folder').length !== 1 ? 's' : ''})`}</Typography>
             </Box>
 

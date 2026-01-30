@@ -12,7 +12,7 @@ import {
     ContentCopy as CopyIcon, Block as BlockIcon, CheckCircle as EnableIcon,
     Edit as EditIcon, OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
-import { useThemeColors } from '../hooks';
+import { useTheme, alpha } from '@mui/material';
 import { formatDate, copyToClipboard, confirmAction } from '../utils/commonUtils';
 
 // Provider icon component
@@ -26,14 +26,14 @@ const ProviderIcon = ({ providerId }) => {
 };
 
 // User avatar component
-const UserAvatar = ({ user, isDark }) => (
-    <Avatar sx={{ width: 28, height: 28, fontSize: '0.75rem', bgcolor: isDark ? '#555' : '#ccc', color: isDark ? '#fff' : '#333' }}>
+const UserAvatar = ({ user }) => (
+    <Avatar sx={{ width: 28, height: 28, fontSize: '0.75rem', bgcolor: 'action.disabledBackground', color: 'text.primary' }}>
         {(user.displayName?.[0] || user.email?.[0] || '?').toUpperCase()}
     </Avatar>
 );
 
 function AuthTab({ project, addLog, showMessage }) {
-    const { isDark, borderColor, bgColor, hoverBg, textColor, mutedColor, selectedBg, chipBg, cardBg } = useThemeColors();
+    const theme = useTheme();
 
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -153,7 +153,7 @@ function AuthTab({ project, addLog, showMessage }) {
         const confirmed = await confirmAction(
             'Delete User?',
             `Are you sure you want to delete <strong>"${user.email || user.uid}"</strong>?<br><small style="color: #888;">This will permanently delete the user account.</small>`,
-            { confirmText: 'Delete', isDark }
+            { confirmText: 'Delete', isDark: theme.palette.mode === 'dark' }
         );
 
         if (confirmed) {
@@ -253,14 +253,14 @@ function AuthTab({ project, addLog, showMessage }) {
     });
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: bgColor }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: 'background.default' }}>
             {/* Toolbar */}
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: `1px solid ${borderColor}`, gap: 1 }}>
-                <Chip label={project?.projectId} size="small" sx={{ backgroundColor: chipBg }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: 1, borderColor: 'divider', gap: 1 }}>
+                <Chip label={project?.projectId} size="small" sx={{ backgroundColor: 'action.selected' }} />
                 <Chip label={`${users.length} users`} size="small" variant="outlined" />
                 <Box sx={{ flexGrow: 1 }} />
                 <TextField size="small" placeholder="Search users..." value={searchText} onChange={(e) => setSearchText(e.target.value)} sx={{ width: 200 }}
-                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: mutedColor }} /></InputAdornment>, sx: { fontSize: '0.85rem', height: 32 } }} />
+                    InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: 'text.secondary' }} /></InputAdornment>, sx: { fontSize: '0.85rem', height: 32 } }} />
                 <Tooltip title="Create User"><IconButton size="small" onClick={() => setCreateDialogOpen(true)}><AddIcon sx={{ fontSize: 20 }} /></IconButton></Tooltip>
                 <Tooltip title="Refresh"><IconButton size="small" onClick={loadUsers}><RefreshIcon sx={{ fontSize: 20 }} /></IconButton></Tooltip>
             </Box>
@@ -270,9 +270,9 @@ function AuthTab({ project, addLog, showMessage }) {
                 {loading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box>
                 ) : authError ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: mutedColor, p: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'text.secondary', p: 4 }}>
                         <PersonIcon sx={{ fontSize: 64, opacity: 0.3, mb: 2, color: '#f44336' }} />
-                        <Typography variant="h6" sx={{ mb: 1, color: textColor }}>Authentication Not Enabled</Typography>
+                        <Typography variant="h6" sx={{ mb: 1, color: 'text.primary' }}>Authentication Not Enabled</Typography>
                         <Typography sx={{ textAlign: 'center', maxWidth: 450, mb: 3 }}>
                             Firebase Authentication is not enabled for this project. Enable it in the Firebase Console to manage users.
                         </Typography>
@@ -284,7 +284,7 @@ function AuthTab({ project, addLog, showMessage }) {
                         >
                             Open Firebase Console
                         </Button>
-                        <Typography variant="caption" sx={{ mt: 2, color: mutedColor }}>
+                        <Typography variant="caption" sx={{ mt: 2, color: 'text.secondary' }}>
                             After enabling Authentication, click Refresh to reload.
                         </Typography>
                         <Button variant="text" size="small" onClick={loadUsers} sx={{ mt: 1 }}>
@@ -292,7 +292,7 @@ function AuthTab({ project, addLog, showMessage }) {
                         </Button>
                     </Box>
                 ) : filteredUsers.length === 0 ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: mutedColor }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'text.secondary' }}>
                         <PersonIcon sx={{ fontSize: 64, opacity: 0.3, mb: 2 }} />
                         <Typography>{searchText ? 'No users match your search' : 'No users found'}</Typography>
                         <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)} sx={{ mt: 2 }}>Create User</Button>
@@ -302,38 +302,38 @@ function AuthTab({ project, addLog, showMessage }) {
                         <Table size="small" stickyHeader>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 50 }}></TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor }}>Email</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor }}>Display Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 100 }}>Providers</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 100 }}>Status</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 150 }}>Created</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 150 }}>Last Sign In</TableCell>
-                                    <TableCell sx={{ fontWeight: 600, backgroundColor: bgColor, color: textColor, width: 50 }}></TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 50 }}></TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary' }}>Email</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary' }}>Display Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 100 }}>Providers</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 100 }}>Status</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 150 }}>Created</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 150 }}>Last Sign In</TableCell>
+                                    <TableCell sx={{ fontWeight: 600, backgroundColor: 'background.default', color: 'text.primary', width: 50 }}></TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {filteredUsers.map((user) => (
                                     <TableRow key={user.uid} onClick={() => openEditDialog(user)}
-                                        sx={{ cursor: 'pointer', '&:hover': { backgroundColor: hoverBg }, backgroundColor: selectedUser?.uid === user.uid ? selectedBg : 'transparent', opacity: user.disabled ? 0.5 : 1 }}>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}><UserAvatar user={user} isDark={isDark} /></TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}>
+                                        sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' }, backgroundColor: selectedUser?.uid === user.uid ? 'action.selected' : 'transparent', opacity: user.disabled ? 0.5 : 1 }}>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}><UserAvatar user={user} /></TableCell>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <Typography sx={{ fontSize: '0.85rem', color: textColor }}>{user.email || '—'}</Typography>
+                                                <Typography sx={{ fontSize: '0.85rem', color: 'text.primary' }}>{user.email || '—'}</Typography>
                                                 {user.emailVerified && <Tooltip title="Email verified"><VerifiedIcon sx={{ fontSize: 14, color: '#4caf50' }} /></Tooltip>}
                                             </Box>
-                                            <Typography sx={{ fontSize: '0.7rem', color: mutedColor, fontFamily: 'monospace' }}>{user.uid}</Typography>
+                                            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontFamily: 'monospace' }}>{user.uid}</Typography>
                                         </TableCell>
-                                        <TableCell sx={{ fontSize: '0.85rem', color: textColor, borderBottom: `1px solid ${borderColor}` }}>{user.displayName || '—'}</TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}>
+                                        <TableCell sx={{ fontSize: '0.85rem', color: 'text.primary', borderBottom: 1, borderColor: 'divider' }}>{user.displayName || '—'}</TableCell>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                             <Box sx={{ display: 'flex', gap: 0.5 }}>{(user.providerData || []).map((p, i) => <Tooltip key={i} title={p.providerId}><span><ProviderIcon providerId={p.providerId} /></span></Tooltip>)}</Box>
                                         </TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                                             {user.disabled ? <Chip label="Disabled" size="small" color="error" sx={{ fontSize: '0.7rem', height: 20 }} /> : <Chip label="Active" size="small" color="success" sx={{ fontSize: '0.7rem', height: 20 }} />}
                                         </TableCell>
-                                        <TableCell sx={{ fontSize: '0.75rem', color: mutedColor, borderBottom: `1px solid ${borderColor}` }}>{formatDate(user.metadata?.creationTime)}</TableCell>
-                                        <TableCell sx={{ fontSize: '0.75rem', color: mutedColor, borderBottom: `1px solid ${borderColor}` }}>{formatDate(user.metadata?.lastSignInTime)}</TableCell>
-                                        <TableCell sx={{ borderBottom: `1px solid ${borderColor}` }}><IconButton size="small" onClick={(e) => handleContextMenu(e, user)}><MoreVertIcon sx={{ fontSize: 16 }} /></IconButton></TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary', borderBottom: 1, borderColor: 'divider' }}>{formatDate(user.metadata?.creationTime)}</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', color: 'text.secondary', borderBottom: 1, borderColor: 'divider' }}>{formatDate(user.metadata?.lastSignInTime)}</TableCell>
+                                        <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}><IconButton size="small" onClick={(e) => handleContextMenu(e, user)}><MoreVertIcon sx={{ fontSize: 16 }} /></IconButton></TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -343,7 +343,7 @@ function AuthTab({ project, addLog, showMessage }) {
             </Box>
 
             {/* Status Bar */}
-            <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderTop: `1px solid ${borderColor}`, fontSize: '0.75rem', color: mutedColor }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, borderTop: 1, borderColor: 'divider', fontSize: '0.75rem', color: 'text.secondary' }}>
                 <Typography variant="caption">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}{searchText && ` (filtered from ${users.length})`}</Typography>
             </Box>
 
@@ -436,7 +436,7 @@ function AuthTab({ project, addLog, showMessage }) {
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => { setCreateDialogOpen(false); resetCreateUserForm(); }} sx={{ color: isDark ? '#fff' : undefined }}>Cancel</Button>
+                    <Button onClick={() => { setCreateDialogOpen(false); resetCreateUserForm(); }} sx={{ color: theme.palette.mode === 'dark' ? '#fff' : undefined }}>Cancel</Button>
                     <Button variant="contained" onClick={handleCreateUser} disabled={!newUserEmail || !newUserPassword}>Create</Button>
                 </DialogActions>
             </Dialog>
@@ -445,11 +445,11 @@ function AuthTab({ project, addLog, showMessage }) {
             <Dialog open={editDialogOpen} onClose={() => { setEditDialogOpen(false); resetEditForm(); }} maxWidth="sm" fullWidth>
                 <DialogTitle>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ bgcolor: isDark ? '#555' : '#ccc', color: isDark ? '#fff' : '#333' }}>{(editUser?.displayName?.[0] || editUser?.email?.[0] || '?').toUpperCase()}</Avatar>
+                        <Avatar sx={{ bgcolor: theme.palette.mode === 'dark' ? '#555' : '#ccc', color: theme.palette.mode === 'dark' ? '#fff' : '#333' }}>{(editUser?.displayName?.[0] || editUser?.email?.[0] || '?').toUpperCase()}</Avatar>
                         <Box sx={{ flex: 1 }}>
                             <Typography variant="h6">{editUser?.displayName || editUser?.email || 'User'}</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: mutedColor, fontFamily: 'monospace' }}>{editUser?.uid}</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'monospace' }}>{editUser?.uid}</Typography>
                                 <IconButton size="small" onClick={() => handleCopy(editUser?.uid)}><CopyIcon sx={{ fontSize: 12 }} /></IconButton>
                             </Box>
                         </Box>
@@ -459,16 +459,16 @@ function AuthTab({ project, addLog, showMessage }) {
                     {/* User Metadata Info */}
                     <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ color: mutedColor }}>Created:</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Created:</Typography>
                             <Typography variant="caption">{formatDate(editUser?.metadata?.creationTime)}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ color: mutedColor }}>Last Sign In:</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Last Sign In:</Typography>
                             <Typography variant="caption">{formatDate(editUser?.metadata?.lastSignInTime)}</Typography>
                         </Box>
                         {editUser?.providerData?.length > 0 && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: mutedColor }}>Providers:</Typography>
+                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>Providers:</Typography>
                                 {editUser.providerData.map((p, i) => <Chip key={i} label={p.providerId} size="small" sx={{ height: 18, fontSize: '0.65rem' }} />)}
                             </Box>
                         )}
@@ -544,14 +544,14 @@ function AuthTab({ project, addLog, showMessage }) {
                     </Box>
 
                     {/* Warning */}
-                    <Box sx={{ mt: 2, p: 1.5, backgroundColor: isDark ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 152, 0, 0.08)', borderRadius: 1, border: '1px solid rgba(255, 152, 0, 0.3)' }}>
-                        <Typography variant="caption" sx={{ color: '#ff9800' }}>
+                    <Box sx={{ mt: 2, p: 1.5, backgroundColor: (theme) => alpha(theme.palette.warning.main, 0.1), borderRadius: 1, border: 1, borderColor: (theme) => alpha(theme.palette.warning.main, 0.3) }}>
+                        <Typography variant="caption" sx={{ color: 'warning.main' }}>
                             ⚠️ Changing phone number, email, or password might log the user out of your app and will not send an automated SMS or email.
                         </Typography>
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => { setEditDialogOpen(false); resetEditForm(); }} sx={{ color: isDark ? '#fff' : undefined }}>Cancel</Button>
+                    <Button onClick={() => { setEditDialogOpen(false); resetEditForm(); }} sx={{ color: theme.palette.mode === 'dark' ? '#fff' : undefined }}>Cancel</Button>
                     <Button variant="contained" onClick={handleUpdateUser}>Save Changes</Button>
                 </DialogActions>
             </Dialog>

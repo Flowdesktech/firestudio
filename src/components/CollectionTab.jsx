@@ -55,13 +55,7 @@ import SettingsDialog from './SettingsDialog';
 /**
  * Theme configuration for consistent styling
  */
-const useThemeColors = (isDark) => ({
-    borderColor: isDark ? '#333' : '#e0e0e0',
-    bgColor: isDark ? '#1e1e1e' : '#fafafa',
-    hoverBg: isDark ? '#333' : '#f5f5f5',
-    textColor: isDark ? '#ccc' : '#333',
-    mutedColor: isDark ? '#888' : '#666'
-});
+// Theme configuration removed - using MUI theme directly
 
 /**
  * CollectionTab - Main component for Firestore collection management
@@ -76,8 +70,6 @@ function CollectionTab({
 }) {
     // Theme
     const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
-    const colors = useThemeColors(isDark);
 
     // Favorites
     const { isFavorite, toggleFavorite } = useFavorites();
@@ -177,6 +169,21 @@ function CollectionTab({
         window.addEventListener('refresh-collection', handleRefreshCollection);
         return () => window.removeEventListener('refresh-collection', handleRefreshCollection);
     }, [project?.projectId, collectionPath, loadDocuments]);
+
+    // Listen for load-query events to load saved queries
+    useEffect(() => {
+        const handleLoadQuery = (e) => {
+            const { query } = e.detail || {};
+            if (query) {
+                // Switch to JS query mode and load the query
+                setQueryMode('js');
+                setJsQuery(query);
+            }
+        };
+
+        window.addEventListener('load-query', handleLoadQuery);
+        return () => window.removeEventListener('load-query', handleLoadQuery);
+    }, [setJsQuery]);
 
     // Computed values
     const allFields = useMemo(() => extractAllFields(documents), [documents]);
@@ -344,14 +351,14 @@ function CollectionTab({
     // Type utility wrappers for child components
     const getType = useCallback((value) => getValueType(value), []);
     const formatValue = useCallback((value, type) => formatDisplayValue(value, type), []);
-    const getColor = useCallback((type) => getTypeColor(type, isDark), [isDark]);
+    const getColor = useCallback((type) => getTypeColor(type, theme.palette.mode === 'dark'), [theme.palette.mode]);
 
     return (
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
-            backgroundColor: isDark ? '#1e1e1e' : '#fff'
+            bgcolor: 'background.default'
         }}>
             {/* Query Bar */}
             <QueryBar
@@ -363,9 +370,6 @@ function CollectionTab({
                 onRunQuery={handleRunQuery}
                 limit={limit}
                 setLimit={setLimit}
-                isDark={isDark}
-                borderColor={colors.borderColor}
-                bgColor={colors.bgColor}
             />
 
             {/* JS Query Editor */}
@@ -373,8 +377,9 @@ function CollectionTab({
                 <JsQueryEditor
                     jsQuery={jsQuery}
                     setJsQuery={setJsQuery}
-                    isDark={isDark}
-                    borderColor={colors.borderColor}
+                    projectId={project?.projectId}
+                    collectionPath={collectionPath}
+                    fieldNames={allFields}
                 />
             )}
 
@@ -383,11 +388,12 @@ function CollectionTab({
                 display: 'flex',
                 alignItems: 'center',
                 p: 0.5,
-                borderBottom: `1px solid ${colors.borderColor}`,
+                borderBottom: 1,
+                borderColor: 'divider',
                 gap: 1
             }}>
-                <CollectionIcon sx={{ fontSize: 16, color: colors.mutedColor, ml: 1 }} />
-                <Typography sx={{ fontSize: '0.8rem', color: colors.textColor }}>
+                <CollectionIcon sx={{ fontSize: 16, color: 'text.secondary', ml: 1 }} />
+                <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
                     {collectionPath}
                 </Typography>
                 <Box sx={{ flexGrow: 1 }} />
@@ -409,9 +415,6 @@ function CollectionTab({
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
                     allFields={allFields}
-                    isDark={isDark}
-                    borderColor={colors.borderColor}
-                    textColor={colors.textColor}
                 />
             )}
 
@@ -429,10 +432,6 @@ function CollectionTab({
                 visibleFields={visibleFields}
                 hiddenColumns={hiddenColumns}
                 setHiddenColumns={setHiddenColumns}
-                isDark={isDark}
-                borderColor={colors.borderColor}
-                textColor={colors.textColor}
-                mutedColor={colors.mutedColor}
                 selectedRowsCount={selectedRows.length}
             />
 
@@ -459,11 +458,6 @@ function CollectionTab({
                                 getType={getType}
                                 getTypeColor={getColor}
                                 formatValue={formatValue}
-                                isDark={isDark}
-                                borderColor={colors.borderColor}
-                                bgColor={colors.bgColor}
-                                textColor={colors.textColor}
-                                mutedColor={colors.mutedColor}
                                 selectedRows={selectedRows}
                                 setSelectedRows={setSelectedRows}
                             />
@@ -484,12 +478,6 @@ function CollectionTab({
                                 getType={getType}
                                 getTypeColor={getColor}
                                 formatValue={formatValue}
-                                isDark={isDark}
-                                borderColor={colors.borderColor}
-                                bgColor={colors.bgColor}
-                                textColor={colors.textColor}
-                                mutedColor={colors.mutedColor}
-                                hoverBg={colors.hoverBg}
                             />
                         )}
 
@@ -500,8 +488,6 @@ function CollectionTab({
                                 jsonHasChanges={jsonHasChanges}
                                 setJsonHasChanges={setJsonHasChanges}
                                 onSave={handleJsonSave}
-                                borderColor={colors.borderColor}
-                                bgColor={colors.bgColor}
                             />
                         )}
                     </>
