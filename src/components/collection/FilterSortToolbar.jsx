@@ -16,6 +16,7 @@ function FilterSortToolbar({
     sortConfig,
     setSortConfig,
     allFields,
+    onApply,
 }) {
     const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
     const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
@@ -125,7 +126,7 @@ function FilterSortToolbar({
                             + Add Filter
                         </Button>
                         {filters.length > 0 && (
-                            <Button size="small" variant="contained" onClick={() => setFilterMenuOpen(false)} sx={{ fontSize: '0.75rem', ml: 1 }}>
+                            <Button size="small" variant="contained" onClick={() => { setFilterMenuOpen(false); setTimeout(() => onApply?.(), 50); }} sx={{ fontSize: '0.75rem', ml: 1 }}>
                                 Apply
                             </Button>
                         )}
@@ -167,7 +168,7 @@ function FilterSortToolbar({
                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: 'text.primary' }}>Sort By</Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, maxHeight: 200, overflow: 'auto' }}>
                             <Box
-                                onClick={() => { setSortConfig({ field: '', direction: 'asc' }); setSortMenuOpen(false); }}
+                                onClick={() => { setSortConfig({ field: '', direction: 'asc' }); setSortMenuOpen(false); setTimeout(() => onApply?.(), 50); }}
                                 sx={{ px: 1, py: 0.5, cursor: 'pointer', borderRadius: 0.5, '&:hover': { bgcolor: 'action.hover' }, color: !sortConfig.field ? 'primary.main' : 'text.primary' }}
                             >
                                 None
@@ -182,6 +183,7 @@ function FilterSortToolbar({
                                             setSortConfig({ field: f, direction: 'asc' });
                                         }
                                         setSortMenuOpen(false);
+                                        setTimeout(() => onApply?.(), 50);
                                     }}
                                     sx={{
                                         px: 1,

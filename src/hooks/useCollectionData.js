@@ -25,6 +25,8 @@ export const useCollectionData = (project, collectionPath, options = {}) => {
     const [loading, setLoading] = useState(false);
     const [limit, setLimit] = useState(defaultLimit);
     const [jsQuery, setJsQuery] = useState('');
+    const [filters, setFilters] = useState([]);
+    const [sortConfig, setSortConfig] = useState({ field: '', direction: 'asc' });
 
     // Refs for keyboard shortcuts
     const queryModeRef = useRef('simple');
@@ -356,12 +358,55 @@ export const useCollectionData = (project, collectionPath, options = {}) => {
         }
     }, [project, collectionPath, addLog, showMessage, loadDocuments]);
 
-    // Initialize JS query when collection changes
+    /**
+     * Generates JS query from current filters, sort, and limit
+     */
+    const generateQueryFromFilters = useCallback(() => {
+        if (!collectionPath) return '';
+
+        let query = `async function run() {\n    const snapshot = await db\n        .collection('${collectionPath}')`;
+
+        // Add where clauses for each filter
+        const validFilters = filters.filter(f => f.field && f.value !== '');
+        validFilters.forEach(filter => {
+            // Try to parse value as number or boolean
+            let value = filter.value;
+            if (value === 'true') value = true;
+            else if (value === 'false') value = false;
+            else if (!isNaN(Number(value)) && value !== '') value = Number(value);
+            else value = `'${value}'`;
+
+            query += `\n        .where('${filter.field}', '${filter.operator}', ${value})`;
+        });
+
+        // Add orderBy if set
+        if (sortConfig.field) {
+            query += `\n        .orderBy('${sortConfig.field}', '${sortConfig.direction}')`;
+        }
+
+        // Add limit
+        query += `\n        .limit(${limit})`;
+        query += `\n        .get();\n    return snapshot;\n}`;
+
+        return query;
+    }, [collectionPath, filters, sortConfig, limit]);
+
+    /**
+     * Updates JS query when filters/sort/limit change
+     */
+    const updateJsQueryFromFilters = useCallback(() => {
+        const newQuery = generateQueryFromFilters();
+        if (newQuery) {
+            setJsQuery(newQuery);
+        }
+    }, [generateQueryFromFilters]);
+
+    // Initialize and update JS query when collection, filters, sort, or limit change
     useEffect(() => {
         if (collectionPath) {
-            setJsQuery(generateDefaultJsQuery(collectionPath, limit));
+            updateJsQueryFromFilters();
         }
-    }, [collectionPath, limit]);
+    }, [collectionPath, filters, sortConfig, limit, updateJsQueryFromFilters]);
 
     // Initial load
     useEffect(() => {
@@ -376,16 +421,21 @@ export const useCollectionData = (project, collectionPath, options = {}) => {
         loading,
         limit,
         jsQuery,
+        filters,
+        sortConfig,
 
         // Setters
         setLimit,
         setJsQuery,
         setDocuments,
         setQueryModeRef,
+        setFilters,
+        setSortConfig,
 
         // Query operations
         loadDocuments,
         executeJsQuery,
+        generateQueryFromFilters,
 
         // Document operations
         updateDocument,

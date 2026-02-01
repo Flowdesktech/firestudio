@@ -36,7 +36,6 @@ import {
     processDocuments,
     getVisibleFields,
     documentsToJson,
-    createDefaultSortConfig
 } from '../utils';
 
 // Sub-components
@@ -81,9 +80,13 @@ function CollectionTab({
         loading,
         limit,
         jsQuery,
+        filters,
+        sortConfig,
         setLimit,
         setJsQuery,
         setQueryModeRef,
+        setFilters,
+        setSortConfig,
         loadDocuments,
         executeJsQuery,
         updateDocument,
@@ -112,8 +115,6 @@ function CollectionTab({
     const [newDocData, setNewDocData] = useState('{}');
     const [columnWidths, setColumnWidths] = useState({});
     const [hiddenColumns, setHiddenColumns] = useState({});
-    const [sortConfig, setSortConfig] = useState(createDefaultSortConfig());
-    const [filters, setFilters] = useState([]);
     const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
     const [selectedRows, setSelectedRows] = useState([]);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -193,9 +194,10 @@ function CollectionTab({
         [allFields, hiddenColumns]
     );
 
+    // Only use searchText for local filtering - filters are applied server-side
     const filteredDocs = useMemo(
-        () => processDocuments(documents, { filters, searchText: filterText, sortConfig }),
-        [documents, filters, filterText, sortConfig]
+        () => processDocuments(documents, { filters: [], searchText: filterText, sortConfig: { field: '', direction: 'asc' } }),
+        [documents, filterText]
     );
 
     // Event Handlers
@@ -415,6 +417,7 @@ function CollectionTab({
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
                     allFields={allFields}
+                    onApply={executeJsQuery}
                 />
             )}
 
