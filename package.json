@@ -1,6 +1,6 @@
 {
   "name": "firestudio",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "A powerful open-source GUI client for Firebase Firestore",
   "main": "electron/main.js",
   "scripts": {

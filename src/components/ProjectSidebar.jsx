@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Box,
     Typography,
@@ -12,6 +12,8 @@ import {
     useTheme,
     Button,
     CircularProgress,
+    TextField,
+    InputAdornment,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -42,6 +44,8 @@ import {
     Link as LinkIcon,
     NoteAdd as AddDocIcon,
     Code as CodeIcon,
+    Search as SearchIcon,
+    Clear as ClearIcon,
 } from '@mui/icons-material';
 import { useProjects } from '../context/ProjectsContext';
 
@@ -96,6 +100,7 @@ function ProjectSidebar({
     const [menuAnchor, setMenuAnchor] = useState(null);
     const [menuTarget, setMenuTarget] = useState(null);
     const [reconnecting, setReconnecting] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleReconnect = async (accountId, e) => {
         e?.stopPropagation();
@@ -108,10 +113,19 @@ function ProjectSidebar({
     };
 
     const toggleExpanded = (itemId) => {
-        setExpandedItems(prev => ({
-            ...prev,
-            [itemId]: !prev[itemId]
-        }));
+        // If there's a search query, expand and clear search instead of toggling
+        if (searchQuery) {
+            setExpandedItems(prev => ({
+                ...prev,
+                [itemId]: true
+            }));
+            setSearchQuery('');
+        } else {
+            setExpandedItems(prev => ({
+                ...prev,
+                [itemId]: !prev[itemId]
+            }));
+        }
     };
 
     const handleMenu = (e, target, type) => {
@@ -204,6 +218,42 @@ function ProjectSidebar({
                 </Tooltip>
             </Box>
 
+            {/* Search Box */}
+            <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: 'divider' }}>
+                <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Search collections..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                            </InputAdornment>
+                        ),
+                        endAdornment: searchQuery && (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setSearchQuery('')}
+                                    sx={{ p: 0.25 }}
+                                >
+                                    <ClearIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            </InputAdornment>
+                        ),
+                        sx: {
+                            fontSize: '0.75rem',
+                            height: 28,
+                            '& .MuiInputBase-input': {
+                                py: 0.5,
+                            },
+                        },
+                    }}
+                />
+            </Box>
+
             {/* Projects List */}
             <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
                 {projects.length === 0 ? (
@@ -216,7 +266,16 @@ function ProjectSidebar({
                     <>
                         {/* Google Accounts */}
                         {googleAccounts.map((account) => {
-                            const isAccountExpanded = expandedItems[account.id] !== false;
+                            // Check if any project or collection matches the search
+                            const hasMatchingContent = !searchQuery || account.projects?.some(project =>
+                                project.projectId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                project.collections?.some(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
+                            );
+
+                            // Skip this account if nothing matches
+                            if (!hasMatchingContent) return null;
+
+                            const isAccountExpanded = expandedItems[account.id] !== false || !!searchQuery;
 
                             return (
                                 <Box key={account.id}>
@@ -313,12 +372,18 @@ function ProjectSidebar({
 
                                     {/* Projects under this account */}
                                     <Collapse in={isAccountExpanded}>
-                                        {account.projects?.map((project, projectIndex) => {
+                                        {account.projects?.filter(project => {
+                                            // Filter projects by search query
+                                            if (!searchQuery) return true;
+                                            const query = searchQuery.toLowerCase();
+                                            return project.projectId.toLowerCase().includes(query) ||
+                                                project.collections?.some(c => c.toLowerCase().includes(query));
+                                        }).map((project, projectIndex) => {
                                             // Default: only first project in first account is expanded
                                             const isFirstProject = googleAccounts.indexOf(account) === 0 && projectIndex === 0;
                                             const isProjectExpanded = expandedItems[project.id] !== undefined
                                                 ? expandedItems[project.id]
-                                                : isFirstProject;
+                                                : (isFirstProject || !!searchQuery);
 
                                             return (
                                                 <Box key={project.id}>
@@ -380,13 +445,24 @@ function ProjectSidebar({
                                                     {/* Collections */}
                                                     <Collapse in={isProjectExpanded}>
                                                         <Box sx={{ pl: 5 }}>
-                                                            {project.collections?.map((collection) => {
+                                                            {project.collections?.filter(collection =>
+                                                                !searchQuery || collection.toLowerCase().includes(searchQuery.toLowerCase())
+                                                            ).map((collection) => {
                                                                 const isActive = activeTab?.type === 'collection' && activeTab?.projectId === project.id && activeTab?.collectionPath === collection;
                                                                 const isMenuTarget = isMenuOpen && menuTarget?.menuType === 'collection' && menuTarget?.project?.id === project.id && menuTarget?.collection === collection;
                                                                 return (
                                                                     <Box
                                                                         key={collection}
-                                                                        onClick={() => onOpenCollection(project, collection)}
+                                                                        onClick={() => {
+                                                                            onOpenCollection(project, collection);
+                                                                            // Expand the project and account when selecting from search
+                                                                            setExpandedItems(prev => ({
+                                                                                ...prev,
+                                                                                [account.id]: true,
+                                                                                [project.id]: true
+                                                                            }));
+                                                                            setSearchQuery('');
+                                                                        }}
                                                                         onContextMenu={(e) => handleContextMenu(e, { project, collection }, 'collection')}
                                                                         sx={{
                                                                             display: 'flex',
@@ -500,12 +576,18 @@ function ProjectSidebar({
                         })}
 
                         {/* Service Account Projects */}
-                        {serviceAccountProjects.map((project, index) => {
+                        {serviceAccountProjects.filter(project => {
+                            // Filter service account projects by search query
+                            if (!searchQuery) return true;
+                            const query = searchQuery.toLowerCase();
+                            return project.projectId.toLowerCase().includes(query) ||
+                                project.collections?.some(c => c.toLowerCase().includes(query));
+                        }).map((project, index) => {
                             // Service account projects: only first one expanded if no google accounts
                             const isFirstServiceAccount = googleAccounts.length === 0 && index === 0;
                             const isExpanded = expandedItems[project.id] !== undefined
                                 ? expandedItems[project.id]
-                                : isFirstServiceAccount;
+                                : (isFirstServiceAccount || !!searchQuery);
 
                             return (
                                 <Box key={project.id}>
@@ -572,13 +654,23 @@ function ProjectSidebar({
                                     <Collapse in={isExpanded}>
                                         <Box sx={{ pl: 2 }}>
                                             {/* Collections */}
-                                            {project.collections?.map((collection) => {
+                                            {project.collections?.filter(collection =>
+                                                !searchQuery || collection.toLowerCase().includes(searchQuery.toLowerCase())
+                                            ).map((collection) => {
                                                 const isActive = activeTab?.type === 'collection' && activeTab?.projectId === project.id && activeTab?.collectionPath === collection;
                                                 const isMenuTarget = isMenuOpen && menuTarget?.menuType === 'collection' && menuTarget?.project?.id === project.id && menuTarget?.collection === collection;
                                                 return (
                                                     <Box
                                                         key={collection}
-                                                        onClick={() => onOpenCollection(project, collection)}
+                                                        onClick={() => {
+                                                            onOpenCollection(project, collection);
+                                                            // Expand the project when selecting from search
+                                                            setExpandedItems(prev => ({
+                                                                ...prev,
+                                                                [project.id]: true
+                                                            }));
+                                                            setSearchQuery('');
+                                                        }}
                                                         onContextMenu={(e) => handleContextMenu(e, { project, collection }, 'collection')}
                                                         sx={{
                                                             display: 'flex',

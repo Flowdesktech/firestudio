@@ -151,15 +151,34 @@ function TableView({
 
     // Handle dialog save
     const handleDialogSave = () => {
-        // Update the value through the parent's edit mechanism
-        setEditValue(editDialogData.value);
-        // Trigger edit and then save
-        onCellEdit(editDialogData.docId, editDialogData.field, editDialogData.value);
-        // Use setTimeout to allow state update before saving
-        setTimeout(() => {
-            onCellSave();
-            setEditDialogOpen(false);
-        }, 50);
+        // Parse the value based on original type
+        let parsedValue = editDialogData.value;
+
+        // Try to parse JSON for arrays and objects
+        if (editDialogData.originalType === 'array' || editDialogData.originalType === 'object') {
+            try {
+                parsedValue = JSON.parse(editDialogData.value);
+            } catch (e) {
+                // If JSON parse fails, keep as string
+                console.warn('Failed to parse JSON:', e);
+            }
+        } else if (editDialogData.originalType === 'timestamp') {
+            // Keep as ISO string - the save handler will convert it
+            parsedValue = editDialogData.value;
+        }
+
+        // Save directly with explicit values to avoid stale closure issues
+        onCellSave(editDialogData.docId, editDialogData.field, parsedValue);
+
+        // Close dialog and clear selected cell
+        setEditDialogOpen(false);
+        setSelectedCell(null);
+    };
+
+    // Handle dialog close (cancel)
+    const handleDialogClose = () => {
+        setEditDialogOpen(false);
+        setSelectedCell(null);
     };
 
     const displayedDocs = documents.slice(0, MAX_VISIBLE_ROWS);
@@ -584,7 +603,7 @@ function TableView({
             {/* Edit Dialog for Multi-line/Long Text */}
             <Dialog
                 open={editDialogOpen}
-                onClose={() => setEditDialogOpen(false)}
+                onClose={handleDialogClose}
                 maxWidth="md"
                 fullWidth
             >
@@ -625,7 +644,7 @@ function TableView({
                             }
                             // Escape to close
                             if (e.key === 'Escape') {
-                                setEditDialogOpen(false);
+                                handleDialogClose();
                             }
                         }}
                         sx={{
@@ -649,7 +668,7 @@ function TableView({
                     </Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setEditDialogOpen(false)}>
+                    <Button onClick={handleDialogClose}>
                         Cancel
                     </Button>
                     <Button onClick={handleDialogSave} variant="contained" color="primary">

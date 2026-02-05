@@ -1034,6 +1034,21 @@ function App() {
 
     const activeTab = openTabs.find(t => t.id === activeTabId);
 
+    // Ctrl+W keyboard shortcut to close current tab
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey && e.key === 'w') {
+                e.preventDefault();
+                if (activeTabId) {
+                    handleCloseTab(activeTabId);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeTabId, openTabs]);
+
     // Show loading screen while projects are being restored
     if (projectsLoading) {
         return (
