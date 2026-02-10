@@ -309,7 +309,7 @@ function registerHandlers() {
           }
         });
 
-        server.listen(port, () => shell.openExternal(authUrl));
+        server.listen(port, '127.0.0.1', () => shell.openExternal(authUrl));
         server.on('error', (err) => {
           clearTimeout(timeout);
           if (!resolved) {

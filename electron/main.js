@@ -19,6 +19,9 @@ const controllers = require('./controllers');
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// Set app name for OS-level identification (taskbar, firewall dialogs, etc.)
+app.setName('Firestudio');
+
 // ============================================
 // Window Management
 // ============================================

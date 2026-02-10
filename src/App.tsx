@@ -134,6 +134,20 @@ function FirestudioApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [dispatch, activeTabId]);
 
+  // Listen for native menu events (forwarded from preload as CustomEvents)
+  useEffect(() => {
+    const handleOpenAddProject = () => dispatch(openDialog({ type: 'CONNECTION' }));
+    const handleOpenSettings = () => dispatch(openDialog({ type: 'SETTINGS' }));
+
+    window.addEventListener('open-add-project-dialog', handleOpenAddProject);
+    window.addEventListener('open-settings-dialog', handleOpenSettings);
+
+    return () => {
+      window.removeEventListener('open-add-project-dialog', handleOpenAddProject);
+      window.removeEventListener('open-settings-dialog', handleOpenSettings);
+    };
+  }, [dispatch]);
+
   // Tab Handlers
   const onOpenCollection = (project: Project | GoogleAccount, collectionPath: string) => {
     if (isGoogleAccount(project)) return;
