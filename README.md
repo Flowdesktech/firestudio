@@ -1,3 +1,7 @@
+> **Looking for a developer for your business idea?** Contact at [contact@flowdesk.tech](mailto:contact@flowdesk.tech)
+
+---
+
 # 🔥 Firestudio - Open Source Firebase GUI Client
 
 > A powerful, free, and open-source desktop application for managing Firebase - Firestore, Storage, and Authentication
