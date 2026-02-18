@@ -117,7 +117,7 @@ async function run() {
 ### Prerequisites
 
 - **Node.js** 18 or higher
-- **npm** or **yarn**
+- **pnpm** (`npm install -g pnpm`)
 - A **Firebase project**
 
 ### Installation
@@ -157,10 +157,10 @@ git clone https://github.com/Flowdesktech/firestudio.git
 cd firestudio
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start the application
-npm run dev
+pnpm run dev
 ```
 
 ### Connecting to Your Firebase Project
@@ -196,26 +196,26 @@ See detailed OAuth setup guide in the [Google Sign-In Setup](#google-sign-in-set
 
 ### Development
 
-| Command            | Description                                 |
-| ------------------ | ------------------------------------------- |
-| `npm run dev`      | Start the full Electron app with hot reload |
-| `npm run dev:vite` | Start browser-only mode (limited features)  |
-| `npm run build`    | Build the React app for production          |
+| Command             | Description                                 |
+| ------------------- | ------------------------------------------- |
+| `pnpm run dev`      | Start the full Electron app with hot reload |
+| `pnpm run dev:vite` | Start browser-only mode (limited features)  |
+| `pnpm run build`    | Build the React app for production          |
 
 ### Building Releases
 
-| Command               | Description                                        |
-| --------------------- | -------------------------------------------------- |
-| `npm run build:win`   | Build for Windows (`.exe` installer + portable)    |
-| `npm run build:mac`   | Build for macOS (`.dmg` + `.zip`)                  |
-| `npm run build:linux` | Build for Linux (`.AppImage` + `.deb` + `.tar.gz`) |
-| `npm run build:all`   | Build for all platforms                            |
+| Command                | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| `pnpm run build:win`   | Build for Windows (`.exe` installer + portable)    |
+| `pnpm run build:mac`   | Build for macOS (`.dmg` + `.zip`)                  |
+| `pnpm run build:linux` | Build for Linux (`.AppImage` + `.deb` + `.tar.gz`) |
+| `pnpm run build:all`   | Build for all platforms                            |
 
 ### Utilities
 
-| Command                 | Description                   |
-| ----------------------- | ----------------------------- |
-| `npm run generate-icon` | Regenerate app icons from SVG |
+| Command                  | Description                   |
+| ------------------------ | ----------------------------- |
+| `pnpm run generate-icon` | Regenerate app icons from SVG |
 
 ---
 
@@ -225,16 +225,16 @@ See detailed OAuth setup guide in the [Google Sign-In Setup](#google-sign-in-set
 
 ```bash
 # Windows
-npm run build:win
+pnpm run build:win
 
 # macOS
-npm run build:mac
+pnpm run build:mac
 
 # Linux
-npm run build:linux
+pnpm run build:linux
 
 # All platforms (requires cross-compilation setup)
-npm run build:all
+pnpm run build:all
 ```
 
 **Output files are saved to the `release/` directory:**
@@ -269,7 +269,7 @@ npm run build:all
 
 4. **Build and publish:**
    ```bash
-   npm run release
+   pnpm run release
    ```
 
 ### Cross-Platform Building Notes

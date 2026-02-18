@@ -13,6 +13,7 @@ export interface Project {
   projectId: string;
   authMethod: 'serviceAccount' | 'google';
   serviceAccountPath?: string;
+  databaseId?: string;
   collections?: FirestoreCollection[];
   connected?: boolean;
   expanded?: boolean;
@@ -166,9 +167,9 @@ export const loadProjects = createAppAsyncThunk('projects/loadProjects', async (
 
 export const connectServiceAccount = createAppAsyncThunk(
   'projects/connectServiceAccount',
-  async (serviceAccountPath: string, { extra }) => {
+  async ({ serviceAccountPath, databaseId }: { serviceAccountPath: string; databaseId?: string }, { extra }) => {
     const electron = extra.electron.api;
-    const result = await electron.connectFirebase(serviceAccountPath);
+    const result = await electron.connectFirebase({ serviceAccountPath, databaseId });
     if (!result?.success) throw new Error(result?.error || 'Connection failed');
 
     const collectionsResult = await electron.getCollections();
@@ -177,6 +178,7 @@ export const connectServiceAccount = createAppAsyncThunk(
       id: Date.now().toString(),
       projectId: result.projectId,
       serviceAccountPath,
+      databaseId,
       authMethod: 'serviceAccount' as const,
       collections: collectionsResult?.success ? normalizeCollections(collectionsResult.collections) : [],
       expanded: true,
@@ -204,7 +206,10 @@ export const refreshCollections = createAppAsyncThunk(
       } else {
         // Force reconnect for service account to ensure clean state
         await electron.disconnectFirebase();
-        const connectResult = await electron.connectFirebase(project.serviceAccountPath || '');
+        const connectResult = await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath || '',
+          databaseId: project.databaseId,
+        });
         if (!connectResult?.success) {
           throw new Error(connectResult?.error || 'Failed to connect to Firebase');
         }

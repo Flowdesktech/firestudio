@@ -79,7 +79,10 @@ export const importCollection = createAppAsyncThunk<
       return { count };
     } else {
       await electron.disconnectFirebase();
-      await electron.connectFirebase(project.serviceAccountPath!);
+      await electron.connectFirebase({
+        serviceAccountPath: project.serviceAccountPath!,
+        databaseId: project.databaseId,
+      });
 
       const result = await electron.importDocuments(collection);
       if (!result.success && result.error !== 'Import cancelled') throw new Error(result.error);
@@ -113,7 +116,10 @@ export const exportCollection = createAppAsyncThunk<ExportResult, { project: Pro
         return rejectWithValue('Google export handled by component');
       } else {
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
         const result = await electron.exportCollection(collection);
 
         if (!result.success && result.error !== 'Export cancelled') {
@@ -169,7 +175,10 @@ export const fetchDocuments = createAppAsyncThunk<
       } else {
         // Service Account JS Query
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
 
         const result = await electron.executeJsQuery({ collectionPath: collection, jsQuery });
         if (!result.success) throw new Error(result.error);
@@ -222,7 +231,10 @@ export const fetchDocuments = createAppAsyncThunk<
         // googleGetDocuments usually returns formatted docs.
       } else {
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
 
         const res = await electron.getDocuments({
           collectionPath: collection,
@@ -272,7 +284,10 @@ export const createCollection = createAppAsyncThunk<
       });
     } else {
       await electron.disconnectFirebase();
-      await electron.connectFirebase(project.serviceAccountPath!);
+      await electron.connectFirebase({
+        serviceAccountPath: project.serviceAccountPath!,
+        databaseId: project.databaseId,
+      });
       result = await electron.createDocument({
         collectionPath: trimmedName,
         documentId: finalDocId,
@@ -319,7 +334,10 @@ export const addDocument = createAppAsyncThunk<
         });
       } else {
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
         result = await electron.createDocument({
           collectionPath: collection,
           documentId: finalDocId,
@@ -420,7 +438,10 @@ export const renameCollection = createAppAsyncThunk<
       documents = res.success ? ((res.documents || []) as Document[]) : [];
     } else {
       await electron.disconnectFirebase();
-      await electron.connectFirebase(project.serviceAccountPath!);
+      await electron.connectFirebase({
+        serviceAccountPath: project.serviceAccountPath!,
+        databaseId: project.databaseId,
+      });
       const res = await electron.getDocuments({
         collectionPath: currentPath,
         limit: 10000,
@@ -641,7 +662,10 @@ export const deleteCollection = createAppAsyncThunk<void, { project: Project; co
         documents = res.success ? ((res.documents || []) as Document[]) : [];
       } else {
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
         const res = await electron.getDocuments({
           collectionPath: collection,
           limit: 10000,

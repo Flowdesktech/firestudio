@@ -13,14 +13,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Create .env file
         run: |
@@ -29,11 +32,11 @@ jobs:
 
       - name: Build Windows (unsigned)
         if: vars.ENABLE_CODE_SIGNING != 'true'
-        run: npm run build:win
+        run: pnpm run build:win
 
       - name: Build Windows (signed)
         if: vars.ENABLE_CODE_SIGNING == 'true'
-        run: npm run build:win
+        run: pnpm run build:win
         env:
           CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
@@ -53,14 +56,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Create .env file
         run: |
@@ -69,11 +75,11 @@ jobs:
 
       - name: Build macOS (unsigned)
         if: vars.ENABLE_CODE_SIGNING != 'true'
-        run: npm run build:mac
+        run: pnpm run build:mac
 
       - name: Build macOS (signed)
         if: vars.ENABLE_CODE_SIGNING == 'true'
-        run: npm run build:mac
+        run: pnpm run build:mac
         env:
           CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -96,14 +102,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Create .env file
         run: |
@@ -111,7 +120,7 @@ jobs:
           echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
 
       - name: Build Linux
-        run: npm run build:linux
+        run: pnpm run build:linux
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4

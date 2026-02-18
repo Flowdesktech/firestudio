@@ -29,8 +29,12 @@ function setConnectionChangeCallback(callback) {
  */
 function registerHandlers() {
   // Connect to Firebase with service account
-  ipcMain.handle('firebase:connect', async (event, serviceAccountPath) => {
+  ipcMain.handle('firebase:connect', async (event, params) => {
     try {
+      // Support both object params and legacy string path
+      const serviceAccountPath = typeof params === 'string' ? params : params.serviceAccountPath;
+      const databaseId = typeof params === 'string' ? undefined : params.databaseId;
+
       if (admin) {
         await admin.app().delete();
       }
@@ -44,12 +48,16 @@ function registerHandlers() {
 
       db = admin.firestore();
 
+      if (databaseId) {
+        db.settings({ databaseId });
+      }
+
       // Notify other controllers about the connection change
       if (onConnectionChange) {
         onConnectionChange(admin, db);
       }
 
-      return { success: true, projectId: serviceAccount.project_id };
+      return { success: true, projectId: serviceAccount.project_id, databaseId };
     } catch (error) {
       return { success: false, error: error.message };
     }

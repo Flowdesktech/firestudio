@@ -76,9 +76,11 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
       <ConnectionDialog
         open={type === 'CONNECTION'}
         onClose={handleClose}
-        onConnect={async (path: string) => {
+        onConnect={async (path: string, databaseId: string) => {
           try {
-            const project = await dispatch(connectServiceAccount(path)).unwrap();
+            const project = await dispatch(
+              connectServiceAccount({ serviceAccountPath: path, databaseId: databaseId || undefined }),
+            ).unwrap();
             dispatch(addLog({ type: 'success', message: `Connected to ${project.projectId}` }));
             handleClose();
           } catch (err: unknown) {
