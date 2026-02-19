@@ -13,7 +13,7 @@ ipcRenderer.on('open-settings-dialog', () => {
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Firebase connection
-  connectFirebase: (serviceAccountPath) => ipcRenderer.invoke('firebase:connect', serviceAccountPath),
+  connectFirebase: (params) => ipcRenderer.invoke('firebase:connect', params),
   disconnectFirebase: () => ipcRenderer.invoke('firebase:disconnect'),
 
   // Firestore operations

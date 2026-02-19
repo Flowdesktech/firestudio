@@ -3,11 +3,11 @@
 
 const mockElectronAPI: ElectronAPI = {
   // Firebase connection - mock
-  connectFirebase: async (_serviceAccountPath: string) => {
+  connectFirebase: async (_params: ConnectFirebaseParams) => {
     console.warn('[Mock] connectFirebase called in browser mode');
     return {
       success: false,
-      error: 'Service Account connection requires Electron. Run "npm run dev" for full functionality.',
+      error: 'Service Account connection requires Electron. Run "pnpm run dev" for full functionality.',
     };
   },
   disconnectFirebase: async () => {
@@ -66,7 +66,7 @@ const mockElectronAPI: ElectronAPI = {
     console.warn('[Mock] Google Sign-In requires Electron mode');
     return {
       success: false,
-      error: 'Google Sign-In requires Electron desktop mode. Run "npm run dev" instead of "npm run dev:vite".',
+      error: 'Google Sign-In requires Electron desktop mode. Run "pnpm run dev" instead of "pnpm run dev:vite".',
     };
   },
   googleSignOut: async () => {

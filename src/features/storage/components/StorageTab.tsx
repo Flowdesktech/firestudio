@@ -68,6 +68,7 @@ interface Project {
   projectId: string;
   authMethod: 'google' | 'serviceAccount';
   serviceAccountPath?: string;
+  databaseId?: string;
 }
 
 interface StorageTabProps {
@@ -146,7 +147,10 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
         result = await electron.googleStorageListFiles({ projectId: project.projectId, path: currentPath });
       } else {
         await electron.disconnectFirebase();
-        await electron.connectFirebase(project.serviceAccountPath!);
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: project.databaseId,
+        });
         result = await electron.storageListFiles({ path: currentPath });
       }
 

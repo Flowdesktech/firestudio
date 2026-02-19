@@ -245,7 +245,10 @@ Examples:
                 throw new Error('Missing service account path for project');
               }
               await electron.disconnectFirebase();
-              await electron.connectFirebase(selectedProject.serviceAccountPath);
+              await electron.connectFirebase({
+                serviceAccountPath: selectedProject.serviceAccountPath,
+                databaseId: selectedProject.databaseId,
+              });
               result = await electron.getDocuments({
                 collectionPath,
                 limit,
@@ -283,7 +286,10 @@ Examples:
               throw new Error('Missing service account path for project');
             }
             await electron.disconnectFirebase();
-            await electron.connectFirebase(selectedProject.serviceAccountPath);
+            await electron.connectFirebase({
+              serviceAccountPath: selectedProject.serviceAccountPath,
+              databaseId: selectedProject.databaseId,
+            });
             result = await electron.getDocument(documentPath);
           }
 

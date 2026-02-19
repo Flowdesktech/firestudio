@@ -7,6 +7,7 @@ const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const vm = require('vm');
 
+let adminRef = null;
 let dbRef = null;
 
 function normalizeFirestoreError(error) {
@@ -24,7 +25,7 @@ function normalizeFirestoreError(error) {
  * Sets references to admin SDK and database
  */
 function setRefs(admin, db) {
-  void admin;
+  adminRef = admin;
   dbRef = db;
 }
 
@@ -232,8 +233,16 @@ function registerHandlers() {
       if (!dbRef) throw new Error('Not connected to Firebase');
 
       const wrappedCode = `(async () => { ${jsQuery} return await run(); })()`;
+      const FieldValue = adminRef ? adminRef.firestore.FieldValue : null;
+      const Filter = adminRef ? adminRef.firestore.Filter : null;
+      const Timestamp = adminRef ? adminRef.firestore.Timestamp : null;
+      const GeoPoint = adminRef ? adminRef.firestore.GeoPoint : null;
       const context = vm.createContext({
         db: dbRef,
+        FieldValue,
+        Filter,
+        Timestamp,
+        GeoPoint,
         console,
         Date,
         JSON,

@@ -151,9 +151,15 @@ interface GoogleSignInResult {
   error?: string;
 }
 
+interface ConnectFirebaseParams {
+  serviceAccountPath: string;
+  databaseId?: string;
+}
+
 interface ConnectFirebaseResult {
   success: boolean;
   projectId?: string;
+  databaseId?: string;
   error?: string;
 }
 
@@ -166,7 +172,7 @@ interface GoogleSetRefreshTokenResult {
 
 interface ElectronAPI {
   // Firebase
-  connectFirebase: (serviceAccountPath: string) => Promise<ConnectFirebaseResult>;
+  connectFirebase: (params: ConnectFirebaseParams) => Promise<ConnectFirebaseResult>;
   disconnectFirebase: () => Promise<{ success: boolean }>;
 
   // Firestore

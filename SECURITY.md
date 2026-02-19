@@ -117,9 +117,9 @@ Security patches will be released as soon as possible after a vulnerability is c
 
 ## Third-Party Dependencies
 
-This project depends on several npm packages. We recommend:
+This project depends on several packages. We recommend:
 
-- Running `npm audit` regularly to check for vulnerabilities
+- Running `pnpm audit` regularly to check for vulnerabilities
 - Keeping dependencies updated
 - Reviewing dependency changes before updating
 

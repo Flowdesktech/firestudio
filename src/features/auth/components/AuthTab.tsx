@@ -132,7 +132,10 @@ function AuthTab({ project, addLog, showMessage }: AuthTabProps) {
       const result = isGoogle
         ? await electron.googleListAuthUsers({ projectId: project.projectId, maxResults: 1000 })
         : (await electron.disconnectFirebase(),
-          await electron.connectFirebase(project.serviceAccountPath!),
+          await electron.connectFirebase({
+            serviceAccountPath: project.serviceAccountPath!,
+            databaseId: project.databaseId,
+          }),
           await electron.listAuthUsers({ limit: 1000 }));
 
       if (result.success) {

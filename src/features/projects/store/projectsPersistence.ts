@@ -28,6 +28,7 @@ export const saveProjectsToStorage = (projects: (Project | GoogleAccount)[]) => 
             id: p.id,
             projectId: p.projectId,
             serviceAccountPath: p.serviceAccountPath,
+            databaseId: p.databaseId,
             authMethod: p.authMethod,
             collections: p.collections || [],
           };
