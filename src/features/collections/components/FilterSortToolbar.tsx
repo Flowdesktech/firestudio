@@ -87,9 +87,7 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
                 <select
                   value={filter.field}
                   onChange={(e) => {
-                    const newFilters = [...filters];
-                    newFilters[idx].field = e.target.value;
-                    setFilters(newFilters);
+                    setFilters(filters.map((f, i) => (i === idx ? { ...f, field: e.target.value } : f)));
                   }}
                   className="filter-select"
                   style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
@@ -104,9 +102,7 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
                 <select
                   value={filter.operator}
                   onChange={(e) => {
-                    const newFilters = [...filters];
-                    newFilters[idx].operator = e.target.value;
-                    setFilters(newFilters);
+                    setFilters(filters.map((f, i) => (i === idx ? { ...f, operator: e.target.value } : f)));
                   }}
                   style={{ width: 70, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
                 >
@@ -120,9 +116,7 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
                 <input
                   value={filter.value === null || filter.value === undefined ? '' : String(filter.value)}
                   onChange={(e) => {
-                    const newFilters = [...filters];
-                    newFilters[idx].value = e.target.value;
-                    setFilters(newFilters);
+                    setFilters(filters.map((f, i) => (i === idx ? { ...f, value: e.target.value } : f)));
                   }}
                   placeholder="Value"
                   style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}

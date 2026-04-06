@@ -3,6 +3,11 @@ import { Box, useTheme } from '@mui/material';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
 import { MONOSPACE_FONT_FAMILY, EDITOR_FONT_FAMILY } from '../utils/constants';
+import { countLines } from '../utils/commonUtils';
+
+/** Beyond these limits, skip syntax highlighting and overlay search marks to keep the UI responsive. */
+const MAX_SYNTAX_CHARS = 120_000;
+const MAX_SYNTAX_LINES = 2_500;
 
 // Register languages
 hljs.registerLanguage('javascript', javascript);
@@ -49,24 +54,39 @@ function CodeEditor({
   // Use external ref if provided, otherwise internal
   const textareaRef = externalRef || internalRef;
 
-  // Count lines
-  const lineCount = (value || '').split('\n').length;
-  const lineNumbers = Array.from({ length: Math.max(lineCount, 8) }, (_, i) => i + 1);
+  const raw = value || '';
+  const lineCount = countLines(raw);
+  const minLines = Math.max(lineCount, 8);
+  const skipHeavyWork = raw.length > MAX_SYNTAX_CHARS || lineCount > MAX_SYNTAX_LINES;
 
-  // Highlighted code with search matches
+  const lineNumbersText = useMemo(() => {
+    let s = '';
+    for (let i = 1; i <= minLines; i++) {
+      if (i > 1) s += '\n';
+      s += String(i);
+    }
+    return s;
+  }, [minLines]);
+
+  const gutterWidth = Math.min(96, Math.max(40, 12 + String(minLines).length * 7));
+
   const highlightedCode = useMemo(() => {
-    if (!value) return '';
+    if (!raw) return '';
+    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (skipHeavyWork) {
+      return escapeHtml(raw);
+    }
+
     try {
-      const result = hljs.highlight(value, { language });
+      const result = hljs.highlight(raw, { language });
       let html = result.value;
 
-      // Add search highlighting if searchText exists
       if (searchText) {
         const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const escapedSearch = escapeRegex(searchText);
         const searchRegex = new RegExp(`(${escapedSearch})`, 'gi');
 
-        // Count matches to find current one
         let matchIndex = 0;
         html = html.replace(searchRegex, (match: string) => {
           matchIndex++;
@@ -77,9 +97,9 @@ function CodeEditor({
 
       return html;
     } catch {
-      return value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return escapeHtml(raw);
     }
-  }, [value, language, searchText, currentMatchIndex]);
+  }, [raw, language, searchText, currentMatchIndex, skipHeavyWork]);
 
   // Sync scroll
   const syncScroll = useCallback((target: HTMLTextAreaElement) => {
@@ -149,33 +169,26 @@ function CodeEditor({
       {/* Line Numbers */}
       <Box
         ref={lineNumbersRef}
+        component="pre"
         sx={{
-          width: 45,
-          minWidth: 45,
+          width: gutterWidth,
+          minWidth: gutterWidth,
           bgcolor: editorColors.gutter,
           borderRight: 1,
           borderColor: 'divider',
           overflow: 'hidden',
           pt: 1,
+          m: 0,
           userSelect: 'none',
+          textAlign: 'right',
+          pr: 1.5,
+          fontSize: '13px',
+          lineHeight: '1.5em',
+          fontFamily: MONOSPACE_FONT_FAMILY,
+          color: editorColors.lineNumber,
         }}
       >
-        {lineNumbers.map((num) => (
-          <Box
-            key={num}
-            sx={{
-              height: '1.5em',
-              lineHeight: '1.5em',
-              textAlign: 'right',
-              pr: 1.5,
-              fontSize: '13px',
-              fontFamily: MONOSPACE_FONT_FAMILY,
-              color: editorColors.lineNumber,
-            }}
-          >
-            {num}
-          </Box>
-        ))}
+        {lineNumbersText}
       </Box>
 
       {/* Editor Area */}

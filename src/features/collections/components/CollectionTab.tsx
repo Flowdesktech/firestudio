@@ -60,6 +60,7 @@ import {
   documentsToJson,
   getErrorMessage,
 } from '../../../shared/utils';
+import { generateJsQueryFromSimpleParams } from '../../../shared/utils/queryUtils';
 
 // Sub-components
 import QueryBar from './QueryBar';
@@ -195,18 +196,28 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
     [dispatch, collectionKey],
   );
 
-  const setFilters = useCallback(
-    (filters: Filter[]) => {
-      dispatch(setCollectionFilters({ key: collectionKey, filters }));
+  const syncJsQuery = useCallback(
+    (nextFilters: Filter[], nextSort: SortConfig) => {
+      const query = generateJsQueryFromSimpleParams(collectionPath, nextFilters, nextSort, limit);
+      dispatch(setCollectionJsQuery({ key: collectionKey, query }));
     },
-    [dispatch, collectionKey],
+    [dispatch, collectionKey, collectionPath, limit],
+  );
+
+  const setFilters = useCallback(
+    (nextFilters: Filter[]) => {
+      dispatch(setCollectionFilters({ key: collectionKey, filters: nextFilters }));
+      syncJsQuery(nextFilters, sortConfig);
+    },
+    [dispatch, collectionKey, sortConfig, syncJsQuery],
   );
 
   const setSortConfig = useCallback(
     (config: SortConfig) => {
       dispatch(setCollectionSort({ key: collectionKey, config }));
+      syncJsQuery(filters, config);
     },
-    [dispatch, collectionKey],
+    [dispatch, collectionKey, filters, syncJsQuery],
   );
 
   // Load Documents

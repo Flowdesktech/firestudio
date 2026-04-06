@@ -164,3 +164,13 @@ export const downloadJson = (data: unknown, filename: string): void => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+/** Count lines without splitting the whole string (avoids huge arrays on large files). */
+export const countLines = (text: string): number => {
+  if (!text) return 1;
+  let n = 1;
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) === 10) n++;
+  }
+  return n;
+};

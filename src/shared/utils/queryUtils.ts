@@ -256,6 +256,55 @@ async function run() {
 }`;
 };
 
+interface SimpleFilter {
+  field: string;
+  operator: string;
+  value: FirestoreValue;
+}
+
+interface SimpleSortConfig {
+  field: string | null;
+  direction: 'asc' | 'desc';
+}
+
+const formatFilterValue = (value: FirestoreValue): string => {
+  if (typeof value === 'string') return `'${value}'`;
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+  if (value === null || value === undefined) return 'null';
+  return `'${String(value)}'`;
+};
+
+/**
+ * Generates a JS query string from simple mode parameters (filters, sort, limit)
+ */
+export const generateJsQueryFromSimpleParams = (
+  collectionPath: string,
+  filters: SimpleFilter[],
+  sortConfig: SimpleSortConfig,
+  limit: number = 50,
+): string => {
+  const lines: string[] = [];
+  lines.push(`async function run() {`);
+  lines.push(`    const snapshot = await db`);
+  lines.push(`        .collection('${collectionPath}')`);
+
+  const activeFilters = filters.filter((f) => f.field && f.value !== '');
+  for (const f of activeFilters) {
+    lines.push(`        .where('${f.field}', '${f.operator}', ${formatFilterValue(f.value)})`);
+  }
+
+  if (sortConfig.field) {
+    lines.push(`        .orderBy('${sortConfig.field}', '${sortConfig.direction}')`);
+  }
+
+  lines.push(`        .limit(${limit})`);
+  lines.push(`        .get();`);
+  lines.push(``);
+  lines.push(`    return snapshot;`);
+  lines.push(`}`);
+  return lines.join('\n');
+};
+
 /**
  * Parses Firestore REST API query response into document array
  */

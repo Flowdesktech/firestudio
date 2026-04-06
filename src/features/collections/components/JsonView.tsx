@@ -4,6 +4,7 @@ import { Save as SaveIcon } from '@mui/icons-material';
 import JsonSearchBar from './json/JsonSearchBar';
 import { useJsonSearch } from './json/useJsonSearch';
 import { MONOSPACE_FONT_FAMILY } from '../../../shared/utils/constants';
+import { countLines } from '../../../shared/utils/commonUtils';
 import CodeEditor from '../../../shared/ui/CodeEditor';
 
 interface JsonViewProps {
@@ -38,8 +39,7 @@ const JsonView: React.FC<JsonViewProps> = ({
     prevMatch,
   } = useJsonSearch(jsonEditData, textareaRef);
 
-  // Count lines for line numbers
-  const lineCount = (jsonEditData || '').split('\n').length;
+  const lineCount = countLines(jsonEditData || '');
 
   return (
     <Box
