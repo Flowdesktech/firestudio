@@ -12,6 +12,34 @@ const net = require('net');
 const fetch = require('node-fetch');
 const { convertToFirestoreValue, parseFirestoreDocument } = require('../utils/firestoreHelpers');
 
+/** Path segment for Firestore REST: "(default)" literal or percent-encoded custom id */
+function firestoreDbPathSegment(databaseId) {
+  const id =
+    databaseId !== undefined && databaseId !== null && String(databaseId).trim() !== ''
+      ? String(databaseId).trim()
+      : '(default)';
+  if (id === '(default)') return '(default)';
+  return encodeURIComponent(id);
+}
+
+function databaseIdFromHandlerParams(params, fallback = '(default)') {
+  if (params && typeof params === 'object' && params.databaseId != null && String(params.databaseId).trim() !== '') {
+    return String(params.databaseId).trim();
+  }
+  return fallback;
+}
+
+function parseDatabaseIdFromResourceName(name) {
+  if (!name || typeof name !== 'string') return '(default)';
+  const m = name.match(/\/databases\/([^/]+)$/);
+  if (!m) return '(default)';
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+
 // OAuth Configuration (loaded after env)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID_HERE';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET_HERE';
@@ -388,23 +416,46 @@ function registerHandlers() {
       if (data.results) {
         const projects = [];
         for (const p of data.results) {
-          let collections = [];
+          const firestoreDatabases = [];
           try {
-            const colResult = await authenticatedFetch(
-              `https://firestore.googleapis.com/v1/projects/${p.projectId}/databases/(default)/documents:listCollectionIds`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-              },
+            const listDb = await authenticatedFetch(
+              `https://firestore.googleapis.com/v1/projects/${p.projectId}/databases`,
             );
-            if (colResult.ok && colResult.data.collectionIds) {
-              collections = colResult.data.collectionIds;
+            let dbEntries = [];
+            if (listDb.ok && listDb.data.databases?.length) {
+              dbEntries = listDb.data.databases;
+            } else {
+              dbEntries = [{ name: `projects/${p.projectId}/databases/(default)` }];
+            }
+            for (const db of dbEntries) {
+              const databaseId = parseDatabaseIdFromResourceName(db.name);
+              let collections = [];
+              try {
+                const dbSeg = firestoreDbPathSegment(databaseId);
+                const colResult = await authenticatedFetch(
+                  `https://firestore.googleapis.com/v1/projects/${p.projectId}/databases/${dbSeg}/documents:listCollectionIds`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                  },
+                );
+                if (colResult.ok && colResult.data.collectionIds) {
+                  collections = colResult.data.collectionIds;
+                }
+              } catch (error) {
+                void error;
+              }
+              firestoreDatabases.push({ databaseId, collections });
             }
           } catch (error) {
             void error;
           }
-          projects.push({ projectId: p.projectId, displayName: p.displayName || p.projectId, collections });
+          projects.push({
+            projectId: p.projectId,
+            displayName: p.displayName || p.projectId,
+            firestoreDatabases,
+          });
         }
         return { success: true, projects };
       }
@@ -421,8 +472,10 @@ function registerHandlers() {
       if (!projectId || typeof projectId !== 'string') {
         return { success: false, error: 'Invalid project ID' };
       }
+      const databaseId = typeof params === 'object' && params ? databaseIdFromHandlerParams(params) : '(default)';
+      const dbSeg = firestoreDbPathSegment(databaseId);
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:listCollectionIds`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:listCollectionIds`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
       );
       if (!result.ok) return result.error;
@@ -435,10 +488,11 @@ function registerHandlers() {
     }
   });
 
-  ipcMain.handle('google:getDocuments', async (event, { projectId, collectionPath, limit = 50 }) => {
+  ipcMain.handle('google:getDocuments', async (event, { projectId, collectionPath, limit = 50, databaseId }) => {
     try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionPath}?pageSize=${limit}`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}?pageSize=${limit}`,
       );
       if (!result.ok) return result.error;
 
@@ -460,15 +514,47 @@ function registerHandlers() {
     }
   });
 
-  ipcMain.handle('google:setDocument', async (event, { projectId, collectionPath, documentId, data }) => {
+  ipcMain.handle('google:getDocument', async (event, { projectId, documentPath, databaseId }) => {
+    try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
+      const result = await authenticatedFetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${documentPath}`,
+      );
+      if (!result.ok) return result.error;
+
+      const doc = result.data;
+      if (doc.error)
+        return {
+          success: false,
+          error: doc.error.message,
+          requiresReauth: doc.error.code === 401,
+        };
+
+      const pathParts = doc.name.split('/');
+      const docId = pathParts[pathParts.length - 1];
+      return {
+        success: true,
+        document: {
+          id: docId,
+          data: parseFirestoreDocument(doc.fields || {}),
+          path: documentPath,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google:setDocument', async (event, { projectId, collectionPath, documentId, data, databaseId }) => {
     try {
       const fields = {};
       for (const [key, value] of Object.entries(data)) {
         fields[key] = convertToFirestoreValue(value);
       }
 
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}/${documentId}`,
         { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) },
       );
       if (!result.ok) return result.error;
@@ -486,10 +572,11 @@ function registerHandlers() {
     }
   });
 
-  ipcMain.handle('google:executeStructuredQuery', async (event, { projectId, structuredQuery }) => {
+  ipcMain.handle('google:executeStructuredQuery', async (event, { projectId, structuredQuery, databaseId }) => {
     try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:runQuery`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -507,7 +594,7 @@ function registerHandlers() {
   });
 
   // Count Documents using Aggregation Query
-  ipcMain.handle('google:countDocuments', async (event, { projectId, collectionPath }) => {
+  ipcMain.handle('google:countDocuments', async (event, { projectId, collectionPath, databaseId }) => {
     try {
       const structuredAggregationQuery = {
         structuredAggregationQuery: {
@@ -523,8 +610,9 @@ function registerHandlers() {
         },
       };
 
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runAggregationQuery`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:runAggregationQuery`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -548,10 +636,11 @@ function registerHandlers() {
   });
 
   // Delete Document
-  ipcMain.handle('google:deleteDocument', async (event, { projectId, collectionPath, documentId }) => {
+  ipcMain.handle('google:deleteDocument', async (event, { projectId, collectionPath, documentId, databaseId }) => {
     try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionPath}/${documentId}`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}/${documentId}`,
         { method: 'DELETE' },
       );
       if (!result.ok) return result.error;
@@ -717,14 +806,15 @@ function registerHandlers() {
   // ============================================
 
   // Export single collection (with pagination to get all documents)
-  ipcMain.handle('google:exportCollection', async (event, { projectId, collectionPath }) => {
+  ipcMain.handle('google:exportCollection', async (event, { projectId, collectionPath, databaseId }) => {
     try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const documents = {};
       let nextPageToken = null;
       const pageSize = 300; // Firestore REST API max page size
 
       do {
-        let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionPath}?pageSize=${pageSize}`;
+        let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}?pageSize=${pageSize}`;
         if (nextPageToken) {
           url += `&pageToken=${encodeURIComponent(nextPageToken)}`;
         }
@@ -751,11 +841,12 @@ function registerHandlers() {
   });
 
   // Export all collections (with pagination for each collection)
-  ipcMain.handle('google:exportCollections', async (event, { projectId }) => {
+  ipcMain.handle('google:exportCollections', async (event, { projectId, databaseId }) => {
     try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       // First get all collection IDs
       const colResult = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:listCollectionIds`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:listCollectionIds`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
       );
       if (!colResult.ok) return colResult.error;
@@ -774,7 +865,7 @@ function registerHandlers() {
         let nextPageToken = null;
 
         do {
-          let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collectionId}?pageSize=${pageSize}`;
+          let url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionId}?pageSize=${pageSize}`;
           if (nextPageToken) {
             url += `&pageToken=${encodeURIComponent(nextPageToken)}`;
           }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getServiceAccountConnectDatabaseId } from '../../projects/utils/firestoreDatabaseUtils';
 import {
   Box,
   Typography,
@@ -134,7 +135,7 @@ function AuthTab({ project, addLog, showMessage }: AuthTabProps) {
         : (await electron.disconnectFirebase(),
           await electron.connectFirebase({
             serviceAccountPath: project.serviceAccountPath!,
-            databaseId: project.databaseId,
+            databaseId: getServiceAccountConnectDatabaseId(project),
           }),
           await electron.listAuthUsers({ limit: 1000 }));
 

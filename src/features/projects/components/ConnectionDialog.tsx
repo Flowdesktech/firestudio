@@ -26,7 +26,8 @@ import { electronService } from '../../../shared/services/electronService';
 interface ConnectionDialogProps {
   open: boolean;
   onClose: () => void;
-  onConnect: (serviceAccountPath: string, databaseId: string) => void;
+  /** Connects the service account; additional Firestore databases are added from the sidebar. */
+  onConnect: (serviceAccountPath: string) => void;
   onGoogleSignIn?: () => Promise<void>;
   loading: boolean;
 }
@@ -36,7 +37,6 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
   // isDark removed, use theme.palette directly
   const [tabIndex, setTabIndex] = useState(0);
   const [serviceAccountPath, setServiceAccountPath] = useState('');
-  const [databaseId, setDatabaseId] = useState('');
 
   const handleBrowse = async () => {
     const path = await electronService.api.openFileDialog();
@@ -47,7 +47,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
 
   const handleConnect = () => {
     if (serviceAccountPath) {
-      onConnect(serviceAccountPath, databaseId);
+      onConnect(serviceAccountPath);
     }
   };
 
@@ -60,7 +60,6 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
   const handleClose = () => {
     if (!loading) {
       setServiceAccountPath('');
-      setDatabaseId('');
       setTabIndex(0);
       onClose();
     }
@@ -170,17 +169,10 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
               </Button>
             </Box>
 
-            <TextField
-              fullWidth
-              label="Database ID"
-              value={databaseId}
-              onChange={(e) => setDatabaseId(e.target.value)}
-              placeholder="(default)"
-              helperText="Leave blank to use the default database"
-              size="small"
-              disabled={loading}
-              sx={{ mt: 2 }}
-            />
+            <Typography variant="caption" sx={{ display: 'block', mt: 2, color: 'text.secondary' }}>
+              After connecting, add other Firestore databases (dev, prod, etc.) from the sidebar under{' '}
+              <strong>Firestore</strong> → <strong>Add database</strong>.
+            </Typography>
 
             <Box sx={{ mt: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>

@@ -71,6 +71,8 @@ interface GoogleGetDocumentsParams {
   limit?: number;
   where?: Array<{ field: string; op: string; value: unknown }>;
   orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  /** Firestore database ID, e.g. "(default)" or a custom database name */
+  databaseId?: string;
 }
 
 interface GoogleSetDocumentParams {
@@ -78,27 +80,32 @@ interface GoogleSetDocumentParams {
   collectionPath: string;
   documentId: string;
   data: Record<string, unknown>;
+  databaseId?: string;
 }
 
 interface GoogleDeleteDocumentParams {
   projectId: string;
   collectionPath: string;
   documentId: string;
+  databaseId?: string;
 }
 
 interface StructuredQueryParams {
   projectId: string;
   structuredQuery: Record<string, unknown>;
+  databaseId?: string;
 }
 
 interface GoogleCountParams {
   projectId: string;
   collectionPath: string;
+  databaseId?: string;
 }
 
 interface GoogleExportParams {
   projectId: string;
   collectionPath?: string;
+  databaseId?: string;
 }
 
 interface JsQueryParams {
@@ -208,6 +215,7 @@ interface ElectronAPI {
   googleGetCollections: (params: {
     projectId: string;
     parent?: string;
+    databaseId?: string;
   }) => Promise<{ success: boolean; collections?: FirestoreCollection[]; error?: string }>;
   googleGetDocuments: (
     params: GoogleGetDocumentsParams,
@@ -215,6 +223,7 @@ interface ElectronAPI {
   googleGetDocument: (params: {
     projectId: string;
     documentPath: string;
+    databaseId?: string;
   }) => Promise<{ success: boolean; document?: Record<string, unknown>; error?: string }>;
   googleSetDocument: (params: GoogleSetDocumentParams) => Promise<{ success: boolean; error?: string }>;
   googleDeleteDocument: (params: GoogleDeleteDocumentParams) => Promise<{ success: boolean; error?: string }>;

@@ -31,6 +31,8 @@ export const saveProjectsToStorage = (projects: (Project | GoogleAccount)[]) => 
             databaseId: p.databaseId,
             authMethod: p.authMethod,
             collections: p.collections || [],
+            firestoreDatabases: p.firestoreDatabases || [],
+            activeFirestoreDatabaseId: p.activeFirestoreDatabaseId,
           };
         } else if (isGoogleAccount(p)) {
           return {

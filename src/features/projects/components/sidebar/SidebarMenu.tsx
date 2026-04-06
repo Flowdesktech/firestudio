@@ -17,15 +17,17 @@ interface SidebarMenuProps {
   onExportAllCollections: (project: Project | GoogleAccount) => void;
   onRevealInFirebaseConsole: (project: Project | GoogleAccount) => void;
   onCopyProjectId: (project: Project | GoogleAccount) => void;
-  onAddDocument?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onRenameCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onDeleteCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onExportCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onEstimateDocCount?: (project: Project | GoogleAccount, collectionId: string) => void;
+  onAddDocument?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onRenameCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onDeleteCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onExportCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onEstimateDocCount?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
   onCopyCollectionId?: (collectionId: string) => void;
   onCopyResourcePath?: (project: Project | GoogleAccount, collectionId: string) => void;
   onRevealCollectionInConsole?: (project: Project | GoogleAccount, collectionId: string) => void;
   onDisconnectProject: (project: Project | GoogleAccount) => void;
+  onAddFirestoreDatabase?: (project: Project) => void;
+  onRefreshFirestoreDatabase?: (project: Project, firestoreDatabaseId: string) => void;
 }
 import {
   Add as AddIcon,
@@ -64,9 +66,10 @@ function SidebarMenu({
   onCopyResourcePath,
   onRevealCollectionInConsole,
   onDisconnectProject,
+  onAddFirestoreDatabase,
+  onRefreshFirestoreDatabase,
 }: SidebarMenuProps) {
-  // Helper to close menu before action
-  const handleAction = <Args extends unknown[]>(action: ((...args: Args) => void) | undefined, ...args: Args) => {
+  const handleAction = <A extends unknown[]>(action: ((...args: A) => void) | undefined, ...args: A) => {
     onClose();
     if (action) action(...args);
   };
@@ -156,6 +159,41 @@ function SidebarMenu({
             Copy Project ID
           </MenuItem>
         </>
+      ) : menuTarget?.menuType === 'firestoreRoot' ? (
+        <>
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>Firestore</Typography>
+          </Box>
+          <Divider />
+          <MenuItem onClick={() => handleAction(onAddFirestoreDatabase, menuTarget.project)}>
+            <ListItemIcon>
+              <AddIcon fontSize="small" />
+            </ListItemIcon>
+            Add database
+          </MenuItem>
+        </>
+      ) : menuTarget?.menuType === 'firestoreDatabase' ? (
+        <>
+          <Box sx={{ px: 2, py: 1 }}>
+            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>
+              {menuTarget.firestoreDatabase.label || menuTarget.firestoreDatabase.databaseId}
+            </Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
+              {menuTarget.firestoreDatabase.databaseId}
+            </Typography>
+          </Box>
+          <Divider />
+          <MenuItem
+            onClick={() =>
+              handleAction(onRefreshFirestoreDatabase, menuTarget.project, menuTarget.firestoreDatabase.id)
+            }
+          >
+            <ListItemIcon>
+              <RefreshIcon fontSize="small" />
+            </ListItemIcon>
+            Refresh collections
+          </MenuItem>
+        </>
       ) : menuTarget?.menuType === 'collection' ? (
         // Collection menu
         <>
@@ -165,20 +203,40 @@ function SidebarMenu({
             </Typography>
           </Box>
           <Divider />
-          <MenuItem onClick={() => handleAction(onAddDocument, menuTarget.project, menuTarget.collection)}>
+          <MenuItem
+            onClick={() =>
+              handleAction(onAddDocument, menuTarget.project, menuTarget.collection, menuTarget.firestoreDatabaseId)
+            }
+          >
             <ListItemIcon>
               <AddDocIcon fontSize="small" />
             </ListItemIcon>
             Add Document
           </MenuItem>
-          <MenuItem onClick={() => handleAction(onRenameCollection, menuTarget.project, menuTarget.collection)}>
+          <MenuItem
+            onClick={() =>
+              handleAction(
+                onRenameCollection,
+                menuTarget.project,
+                menuTarget.collection,
+                menuTarget.firestoreDatabaseId,
+              )
+            }
+          >
             <ListItemIcon>
               <EditIcon fontSize="small" />
             </ListItemIcon>
             Rename Collection
           </MenuItem>
           <MenuItem
-            onClick={() => handleAction(onDeleteCollection, menuTarget.project, menuTarget.collection)}
+            onClick={() =>
+              handleAction(
+                onDeleteCollection,
+                menuTarget.project,
+                menuTarget.collection,
+                menuTarget.firestoreDatabaseId,
+              )
+            }
             sx={{ color: 'error.main' }}
           >
             <ListItemIcon>
@@ -187,13 +245,31 @@ function SidebarMenu({
             Delete Collection
           </MenuItem>
           <Divider />
-          <MenuItem onClick={() => handleAction(onExportCollection, menuTarget.project, menuTarget.collection)}>
+          <MenuItem
+            onClick={() =>
+              handleAction(
+                onExportCollection,
+                menuTarget.project,
+                menuTarget.collection,
+                menuTarget.firestoreDatabaseId,
+              )
+            }
+          >
             <ListItemIcon>
               <ExportIcon fontSize="small" />
             </ListItemIcon>
             Export Collection
           </MenuItem>
-          <MenuItem onClick={() => handleAction(onEstimateDocCount, menuTarget.project, menuTarget.collection)}>
+          <MenuItem
+            onClick={() =>
+              handleAction(
+                onEstimateDocCount,
+                menuTarget.project,
+                menuTarget.collection,
+                menuTarget.firestoreDatabaseId,
+              )
+            }
+          >
             <ListItemIcon>
               <NumbersIcon fontSize="small" />
             </ListItemIcon>

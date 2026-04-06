@@ -2,6 +2,16 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { loadProjectsFromStorage } from './projectsPersistence';
 import { ThunkExtra } from '../../../app/store/thunkTypes';
 import { RootState } from '../../../app/store';
+import type { FirestoreDatabase } from '../utils/firestoreDatabaseTypes';
+import {
+  migratePersistedProjectsItem,
+  databaseIdToConnectParam,
+  getActiveFirestoreDatabase,
+  normalizeDatabaseIdInput,
+  defaultLabelForDatabase,
+} from '../utils/firestoreDatabaseUtils';
+
+export type { FirestoreDatabase } from '../utils/firestoreDatabaseTypes';
 
 export interface FirestoreCollection {
   id: string;
@@ -13,8 +23,14 @@ export interface Project {
   projectId: string;
   authMethod: 'serviceAccount' | 'google';
   serviceAccountPath?: string;
+  /** @deprecated Prefer firestoreDatabases; kept for persisted legacy */
   databaseId?: string;
+  /** @deprecated Prefer firestoreDatabases[].collections */
   collections?: FirestoreCollection[];
+  /** Named Firestore databases (service account projects) */
+  firestoreDatabases?: FirestoreDatabase[];
+  /** Which firestoreDatabases[].id is selected in the sidebar */
+  activeFirestoreDatabaseId?: string;
   connected?: boolean;
   expanded?: boolean;
   error?: string;
@@ -162,34 +178,155 @@ export const loadProjects = createAppAsyncThunk('projects/loadProjects', async (
       });
     }
   }
-  return reconnectedProjects;
+  return reconnectedProjects.map((item) => migratePersistedProjectsItem(item)) as (Project | GoogleAccount)[];
 });
 
 export const connectServiceAccount = createAppAsyncThunk(
   'projects/connectServiceAccount',
-  async ({ serviceAccountPath, databaseId }: { serviceAccountPath: string; databaseId?: string }, { extra }) => {
+  async (
+    { serviceAccountPath, databaseId }: { serviceAccountPath: string; databaseId?: string },
+    { extra, getState },
+  ) => {
     const electron = extra.electron.api;
-    const result = await electron.connectFirebase({ serviceAccountPath, databaseId });
+    const state = getState() as RootState;
+    const existing = state.projects.items.find(
+      (item): item is Project =>
+        !isGoogleAccount(item) &&
+        item.authMethod === 'serviceAccount' &&
+        item.serviceAccountPath === serviceAccountPath,
+    );
+
+    const normalized = normalizeDatabaseIdInput(databaseId);
+    if (existing?.firestoreDatabases?.some((d) => d.databaseId.toLowerCase() === normalized.toLowerCase())) {
+      throw new Error(`Database "${normalized}" is already added to this project.`);
+    }
+
+    const result = await electron.connectFirebase({
+      serviceAccountPath,
+      databaseId: databaseIdToConnectParam(normalized),
+    });
     if (!result?.success) throw new Error(result?.error || 'Connection failed');
+    const gcpProjectId = result.projectId;
+    if (!gcpProjectId) throw new Error('Could not read project ID from service account');
 
     const collectionsResult = await electron.getCollections();
+    const collections = collectionsResult?.success ? normalizeCollections(collectionsResult.collections) : [];
+
+    const newFd: FirestoreDatabase = {
+      id: `fd-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      databaseId: normalized,
+      label: defaultLabelForDatabase(normalized),
+      collections,
+    };
+
+    if (existing) {
+      return { mode: 'merge' as const, projectId: existing.id, newDatabase: newFd };
+    }
 
     return {
-      id: Date.now().toString(),
-      projectId: result.projectId,
-      serviceAccountPath,
-      databaseId,
-      authMethod: 'serviceAccount' as const,
-      collections: collectionsResult?.success ? normalizeCollections(collectionsResult.collections) : [],
-      expanded: true,
-      connected: true,
+      mode: 'create' as const,
+      project: {
+        id: Date.now().toString(),
+        projectId: gcpProjectId,
+        serviceAccountPath,
+        authMethod: 'serviceAccount' as const,
+        firestoreDatabases: [newFd],
+        activeFirestoreDatabaseId: newFd.id,
+        expanded: true,
+        connected: true,
+      } satisfies Project,
     };
+  },
+);
+
+export const addFirestoreDatabase = createAppAsyncThunk(
+  'projects/addFirestoreDatabase',
+  async (
+    { projectId, databaseId, label }: { projectId: string; databaseId: string; label?: string },
+    { extra, getState, rejectWithValue },
+  ) => {
+    const state = getState() as RootState;
+    const project = state.projects.items.find((i): i is Project => !isGoogleAccount(i) && i.id === projectId);
+    if (!project || project.authMethod !== 'serviceAccount' || !project.serviceAccountPath) {
+      return rejectWithValue('Invalid project');
+    }
+    const normalized = normalizeDatabaseIdInput(databaseId);
+    if (project.firestoreDatabases?.some((d) => d.databaseId.toLowerCase() === normalized.toLowerCase())) {
+      return rejectWithValue(`Database "${normalized}" is already added.`);
+    }
+    const electron = extra.electron.api;
+    await electron.disconnectFirebase();
+    const result = await electron.connectFirebase({
+      serviceAccountPath: project.serviceAccountPath,
+      databaseId: databaseIdToConnectParam(normalized),
+    });
+    if (!result?.success) throw new Error(result?.error || 'Connection failed');
+    const collectionsResult = await electron.getCollections();
+    const collections = collectionsResult?.success ? normalizeCollections(collectionsResult.collections) : [];
+    const newFd: FirestoreDatabase = {
+      id: `fd-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      databaseId: normalized,
+      label: label?.trim() || defaultLabelForDatabase(normalized),
+      collections,
+    };
+    return { projectId, newDatabase: newFd };
+  },
+);
+
+export const addGoogleFirestoreDatabase = createAppAsyncThunk(
+  'projects/addGoogleFirestoreDatabase',
+  async (
+    { projectId, databaseId, label }: { projectId: string; databaseId: string; label?: string },
+    { extra, getState, rejectWithValue },
+  ) => {
+    const state = getState() as RootState;
+    let googleProject: Project | undefined;
+    let refreshToken: string | undefined;
+    for (const item of state.projects.items) {
+      if (isGoogleAccount(item) && item.projects) {
+        const p = item.projects.find((x) => x.id === projectId);
+        if (p?.authMethod === 'google') {
+          googleProject = p;
+          refreshToken = item.refreshToken;
+          break;
+        }
+      }
+    }
+    if (!googleProject) return rejectWithValue('Invalid project');
+    const normalized = normalizeDatabaseIdInput(databaseId);
+    if (googleProject.firestoreDatabases?.some((d) => d.databaseId.toLowerCase() === normalized.toLowerCase())) {
+      return rejectWithValue(`Database "${normalized}" is already added.`);
+    }
+    const electron = extra.electron.api;
+    if (refreshToken) await electron.googleSetRefreshToken(refreshToken);
+    const result = await electron.googleGetCollections({
+      projectId: googleProject.projectId.trim(),
+      databaseId: normalized,
+    });
+    if (!result?.success) {
+      throw new Error(result?.error || 'Could not access this database. Check the database ID and permissions.');
+    }
+    const collections = normalizeCollections(result.collections || []);
+    const newFd: FirestoreDatabase = {
+      id: `gfd-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      databaseId: normalized,
+      label: label?.trim() || defaultLabelForDatabase(normalized),
+      collections,
+    };
+    return { projectId, newDatabase: newFd };
   },
 );
 
 export const refreshCollections = createAppAsyncThunk(
   'projects/refreshCollections',
-  async ({ project, refreshToken }: { project: Project; refreshToken?: string }, { extra, rejectWithValue }) => {
+  async (
+    {
+      project,
+      refreshToken,
+      firestoreDatabaseId,
+    }: { project: Project; refreshToken?: string; firestoreDatabaseId?: string },
+    { extra, rejectWithValue },
+  ) => {
     const electron = extra.electron.api;
     try {
       if (!project.projectId || typeof project.projectId !== 'string') {
@@ -200,15 +337,32 @@ export const refreshCollections = createAppAsyncThunk(
         if (refreshToken) {
           await electron.googleSetRefreshToken(refreshToken);
         }
-        const result = await electron.googleGetCollections({ projectId: project.projectId.trim() });
+        const fd =
+          (firestoreDatabaseId
+            ? project.firestoreDatabases?.find((d) => d.id === firestoreDatabaseId)
+            : getActiveFirestoreDatabase(project)) || project.firestoreDatabases?.[0];
+        if (!fd) {
+          return rejectWithValue('No Firestore database configured for this project.');
+        }
+        const result = await electron.googleGetCollections({
+          projectId: project.projectId.trim(),
+          databaseId: fd.databaseId,
+        });
         if (!result?.success) throw new Error(result?.error || 'Failed to get collections');
         collections = normalizeCollections(result.collections || []);
+        return { projectId: project.id, collections, firestoreDatabaseId: fd.id };
       } else {
-        // Force reconnect for service account to ensure clean state
+        const fd =
+          (firestoreDatabaseId
+            ? project.firestoreDatabases?.find((d) => d.id === firestoreDatabaseId)
+            : getActiveFirestoreDatabase(project)) || project.firestoreDatabases?.[0];
+        if (!fd) {
+          return rejectWithValue('No Firestore database configured for this project.');
+        }
         await electron.disconnectFirebase();
         const connectResult = await electron.connectFirebase({
           serviceAccountPath: project.serviceAccountPath || '',
-          databaseId: project.databaseId,
+          databaseId: databaseIdToConnectParam(fd.databaseId),
         });
         if (!connectResult?.success) {
           throw new Error(connectResult?.error || 'Failed to connect to Firebase');
@@ -216,8 +370,8 @@ export const refreshCollections = createAppAsyncThunk(
         const result = await electron.getCollections();
         if (!result?.success) throw new Error(result?.error || 'Failed to get collections');
         collections = normalizeCollections(result.collections || []);
+        return { projectId: project.id, collections, firestoreDatabaseId: fd.id };
       }
-      return { projectId: project.id, collections };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to refresh collections';
       return rejectWithValue(message);
@@ -225,9 +379,60 @@ export const refreshCollections = createAppAsyncThunk(
   },
 );
 
+interface GoogleFirestoreDatabaseInfo {
+  databaseId: string;
+  collections?: Array<FirestoreCollection | string>;
+}
+
 interface GoogleProjectInfo {
   projectId: string;
+  displayName?: string;
+  firestoreDatabases?: GoogleFirestoreDatabaseInfo[];
+  /** @deprecated Prefer firestoreDatabases */
   collections?: Array<FirestoreCollection | string>;
+}
+
+function mapGoogleProjectFromApi(
+  proj: GoogleProjectInfo,
+  accountId: string,
+  accessToken: string | undefined,
+  refreshToken: string | undefined,
+  existing: Project | undefined,
+  index: number,
+): Project {
+  const fromApi =
+    proj.firestoreDatabases && proj.firestoreDatabases.length > 0
+      ? proj.firestoreDatabases
+      : [{ databaseId: '(default)', collections: proj.collections || [] }];
+
+  const existingByDbId = new Map((existing?.firestoreDatabases || []).map((fd) => [fd.databaseId, fd]));
+
+  const firestoreDatabases: FirestoreDatabase[] = fromApi.map((fd, idx) => {
+    const prev = existingByDbId.get(fd.databaseId);
+    const safe = fd.databaseId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return {
+      id: prev?.id ?? `g-${proj.projectId}-${safe}-${idx}`,
+      databaseId: fd.databaseId,
+      label: prev?.label ?? defaultLabelForDatabase(fd.databaseId),
+      collections: normalizeCollections(fd.collections || []),
+    };
+  });
+
+  const prevActive = existing?.activeFirestoreDatabaseId;
+  const activeFirestoreDatabaseId =
+    prevActive && firestoreDatabases.some((d) => d.id === prevActive) ? prevActive : firestoreDatabases[0]?.id;
+
+  return {
+    id: existing?.id ?? `${accountId}-${index}-${proj.projectId}`,
+    projectId: proj.projectId,
+    parentAccountId: accountId,
+    authMethod: 'google',
+    accessToken,
+    refreshToken,
+    firestoreDatabases,
+    activeFirestoreDatabaseId,
+    expanded: existing?.expanded ?? false,
+  };
 }
 
 export const refreshGoogleAccountProjects = createAppAsyncThunk(
@@ -258,18 +463,12 @@ export const refreshGoogleAccountProjects = createAppAsyncThunk(
         return rejectWithValue(projectsResult?.error || 'Failed to get Google projects');
       }
 
-      const existingIdByProjectId = new Map((existingAccount?.projects || []).map((proj) => [proj.projectId, proj.id]));
+      const existingByProjectId = new Map((existingAccount?.projects || []).map((proj) => [proj.projectId, proj]));
 
-      const projects = (projectsResult.projects || []).map((proj: GoogleProjectInfo) => ({
-        id: existingIdByProjectId.get(proj.projectId) || `${accountId}-${proj.projectId}`,
-        projectId: proj.projectId,
-        parentAccountId: accountId,
-        authMethod: 'google' as const,
-        accessToken,
-        refreshToken: effectiveRefreshToken,
-        collections: normalizeCollections(proj.collections || []),
-        expanded: false,
-      }));
+      const projects = (projectsResult.projects || []).map((proj: GoogleProjectInfo, index: number) => {
+        const existing = existingByProjectId.get(proj.projectId);
+        return mapGoogleProjectFromApi(proj, accountId, accessToken, effectiveRefreshToken, existing, index);
+      });
 
       return { accountId, accessToken, projects };
     } catch (error) {
@@ -303,16 +502,8 @@ export const signInWithGoogle = createAppAsyncThunk('projects/signInWithGoogle',
     refreshToken,
     expanded: true,
     projects: (projectsResult?.success ? projectsResult.projects || [] : []).map(
-      (proj: GoogleProjectInfo, index: number) => ({
-        id: `${accountId}-${index}-${proj.projectId}`,
-        projectId: proj.projectId,
-        parentAccountId: accountId,
-        authMethod: 'google' as const,
-        accessToken,
-        refreshToken,
-        collections: normalizeCollections(proj.collections || []),
-        expanded: false,
-      }),
+      (proj: GoogleProjectInfo, index: number) =>
+        mapGoogleProjectFromApi(proj, accountId, accessToken, refreshToken, undefined, index),
     ),
   };
 
@@ -350,6 +541,24 @@ const projectsSlice = createSlice({
         state.items[index] = { ...state.items[index], ...changes } as Project | GoogleAccount;
       }
     },
+    setActiveFirestoreDatabase: (state, action: PayloadAction<{ projectId: string; firestoreDatabaseId: string }>) => {
+      const { projectId, firestoreDatabaseId } = action.payload;
+      state.items = state.items.map((item) => {
+        if (!isGoogleAccount(item) && item.id === projectId && item.authMethod === 'serviceAccount') {
+          return { ...item, activeFirestoreDatabaseId: firestoreDatabaseId };
+        }
+        if (isGoogleAccount(item) && item.projects?.some((p) => p.id === projectId)) {
+          return {
+            ...item,
+            projects: item.projects.map((p) =>
+              p.id === projectId ? { ...p, activeFirestoreDatabaseId: firestoreDatabaseId } : p,
+            ),
+          } as GoogleAccount;
+        }
+        return item;
+      });
+      state.selectedProjectId = projectId;
+    },
     // Google Account specific actions
     addGoogleAccount: (state, action: PayloadAction<GoogleAccount>) => {
       const account = action.payload;
@@ -376,9 +585,23 @@ const projectsSlice = createSlice({
         state.loading = true;
       })
       .addCase(connectServiceAccount.fulfilled, (state, action) => {
-        const newProject = action.payload as Project;
-        state.items.push(newProject);
-        state.selectedProjectId = newProject.id;
+        const payload = action.payload;
+        if (payload.mode === 'create') {
+          state.items.push(payload.project);
+          state.selectedProjectId = payload.project.id;
+        } else {
+          const idx = state.items.findIndex((i) => i.id === payload.projectId);
+          if (idx !== -1) {
+            const p = state.items[idx] as Project;
+            state.items[idx] = {
+              ...p,
+              firestoreDatabases: [...(p.firestoreDatabases || []), payload.newDatabase],
+              activeFirestoreDatabaseId: payload.newDatabase.id,
+              connected: true,
+            };
+          }
+          state.selectedProjectId = payload.projectId;
+        }
         state.loading = false;
       })
       .addCase(connectServiceAccount.rejected, (state, action) => {
@@ -386,12 +609,24 @@ const projectsSlice = createSlice({
         state.error = action.error.message || null;
       })
       .addCase(refreshCollections.fulfilled, (state, action) => {
-        const { projectId, collections } = action.payload;
+        const { projectId, collections, firestoreDatabaseId } = action.payload;
 
-        // Note: This logic needs to handle nested Google projects too
         const updateCollections = (items: (Project | GoogleAccount)[]): (Project | GoogleAccount)[] => {
           return items.map((item: Project | GoogleAccount) => {
             if (item.id === projectId) {
+              const proj = item as Project;
+              if (
+                (proj.authMethod === 'serviceAccount' || proj.authMethod === 'google') &&
+                firestoreDatabaseId &&
+                proj.firestoreDatabases?.length
+              ) {
+                return {
+                  ...proj,
+                  firestoreDatabases: proj.firestoreDatabases.map((fd) =>
+                    fd.id === firestoreDatabaseId ? { ...fd, collections } : fd,
+                  ),
+                };
+              }
               return { ...item, collections } as Project;
             }
             if (isGoogleAccount(item) && item.projects) {
@@ -405,6 +640,55 @@ const projectsSlice = createSlice({
         };
 
         state.items = updateCollections(state.items);
+      })
+      .addCase(addFirestoreDatabase.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(addFirestoreDatabase.fulfilled, (state, action) => {
+        const { projectId, newDatabase } = action.payload;
+        const idx = state.items.findIndex((i) => i.id === projectId);
+        if (idx !== -1) {
+          const p = state.items[idx] as Project;
+          state.items[idx] = {
+            ...p,
+            firestoreDatabases: [...(p.firestoreDatabases || []), newDatabase],
+            activeFirestoreDatabaseId: newDatabase.id,
+            connected: true,
+          };
+        }
+        state.selectedProjectId = projectId;
+        state.loading = false;
+      })
+      .addCase(addFirestoreDatabase.rejected, (state) => {
+        state.loading = false;
+      })
+      .addCase(addGoogleFirestoreDatabase.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(addGoogleFirestoreDatabase.fulfilled, (state, action) => {
+        const { projectId, newDatabase } = action.payload;
+        state.items = state.items.map((item) => {
+          if (isGoogleAccount(item) && item.projects?.some((p) => p.id === projectId)) {
+            return {
+              ...item,
+              projects: item.projects.map((p) =>
+                p.id === projectId
+                  ? {
+                      ...p,
+                      firestoreDatabases: [...(p.firestoreDatabases || []), newDatabase],
+                      activeFirestoreDatabaseId: newDatabase.id,
+                    }
+                  : p,
+              ),
+            } as GoogleAccount;
+          }
+          return item;
+        });
+        state.selectedProjectId = projectId;
+        state.loading = false;
+      })
+      .addCase(addGoogleFirestoreDatabase.rejected, (state) => {
+        state.loading = false;
       })
       .addCase(refreshGoogleAccountProjects.fulfilled, (state, action) => {
         const { accountId, accessToken, projects } = action.payload;
@@ -433,7 +717,14 @@ const projectsSlice = createSlice({
   },
 });
 
-export const { addProject, removeProject, setSelectedProject, updateProject, addGoogleAccount } = projectsSlice.actions;
+export const {
+  addProject,
+  removeProject,
+  setSelectedProject,
+  updateProject,
+  addGoogleAccount,
+  setActiveFirestoreDatabase,
+} = projectsSlice.actions;
 
 // Selectors
 export const selectProjects = (state: { projects: ProjectsState }) => state.projects.items;

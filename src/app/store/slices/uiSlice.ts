@@ -9,6 +9,9 @@ export interface Tab {
   docPath?: string | null;
   label: string;
   type: 'collection' | 'storage' | 'auth';
+  /** Service account — FirestoreDatabase.id for collection tabs */
+  firestoreDatabaseId?: string;
+  databaseLabel?: string;
 }
 
 export interface DialogState {

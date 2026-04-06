@@ -138,9 +138,10 @@ describe('projectsSlice thunks', () => {
 
     const project = state.items[0] as Project;
     expect(project.projectId).toBe('test-project');
-    expect(project.databaseId).toBe('my-db');
+    expect(project.firestoreDatabases).toHaveLength(1);
+    expect(project.firestoreDatabases![0].databaseId).toBe('my-db');
     expect(project.connected).toBe(true);
-    expect(project.collections).toHaveLength(2);
+    expect(project.firestoreDatabases![0].collections).toHaveLength(2);
     expect(state.selectedProjectId).toBe(project.id);
   });
 

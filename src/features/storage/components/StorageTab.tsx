@@ -53,6 +53,8 @@ import {
 } from '@mui/icons-material';
 import { formatFileSize, copyToClipboard, confirmAction } from '../../../shared/utils/commonUtils';
 import { electronService } from '../../../shared/services/electronService';
+import { getServiceAccountConnectDatabaseId } from '../../projects/utils/firestoreDatabaseUtils';
+import type { Project as FirebaseProject } from '../../projects/store/projectsSlice';
 
 // Types
 interface StorageItem {
@@ -64,15 +66,8 @@ interface StorageItem {
   updated?: string;
 }
 
-interface Project {
-  projectId: string;
-  authMethod: 'google' | 'serviceAccount';
-  serviceAccountPath?: string;
-  databaseId?: string;
-}
-
 interface StorageTabProps {
-  project: Project | null;
+  project: FirebaseProject | null;
   addLog?: (type: string, message: string) => void;
   showMessage?: (message: string, severity: 'success' | 'error' | 'warning' | 'info') => void;
 }
@@ -149,7 +144,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
         await electron.disconnectFirebase();
         await electron.connectFirebase({
           serviceAccountPath: project.serviceAccountPath!,
-          databaseId: project.databaseId,
+          databaseId: getServiceAccountConnectDatabaseId(project),
         });
         result = await electron.storageListFiles({ path: currentPath });
       }

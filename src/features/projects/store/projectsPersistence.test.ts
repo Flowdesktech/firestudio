@@ -27,14 +27,14 @@ describe('loadProjectsFromStorage', () => {
 });
 
 describe('saveProjectsToStorage', () => {
-  it('serializes service account with minimal fields including databaseId', () => {
+  it('serializes service account with firestoreDatabases', () => {
     const project: Project = {
       id: '1',
       projectId: 'my-project',
       authMethod: 'serviceAccount',
       serviceAccountPath: '/path/to/sa.json',
-      databaseId: 'my-db',
-      collections: [{ id: 'users', path: 'users' }],
+      firestoreDatabases: [{ id: 'fd1', databaseId: 'my-db', collections: [{ id: 'users', path: 'users' }] }],
+      activeFirestoreDatabaseId: 'fd1',
       connected: true,
       expanded: true,
     };
@@ -47,9 +47,10 @@ describe('saveProjectsToStorage', () => {
       id: '1',
       projectId: 'my-project',
       serviceAccountPath: '/path/to/sa.json',
-      databaseId: 'my-db',
       authMethod: 'serviceAccount',
-      collections: [{ id: 'users', path: 'users' }],
+      collections: [],
+      firestoreDatabases: [{ id: 'fd1', databaseId: 'my-db', collections: [{ id: 'users', path: 'users' }] }],
+      activeFirestoreDatabaseId: 'fd1',
     });
     // Runtime state should NOT be persisted
     expect(saved[0].connected).toBeUndefined();

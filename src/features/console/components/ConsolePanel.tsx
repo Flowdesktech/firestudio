@@ -21,6 +21,10 @@ import { useAutocomplete, AutocompleteContext } from '../../../shared/hooks/useA
 import { Project, GoogleAccount } from '../../projects/store/projectsSlice';
 import { isGoogleAccount } from '../../projects/types';
 import { electronService } from '../../../shared/services/electronService';
+import {
+  getServiceAccountConnectDatabaseId,
+  getGoogleApiDatabaseId,
+} from '../../projects/utils/firestoreDatabaseUtils';
 
 // Register JSON language
 hljs.registerLanguage('json', json);
@@ -238,6 +242,7 @@ Examples:
                 projectId: selectedProject.projectId,
                 collectionPath,
                 limit,
+                databaseId: getGoogleApiDatabaseId(selectedProject, selectedProject.activeFirestoreDatabaseId),
               });
             } else {
               // Service account project - connect first
@@ -247,7 +252,7 @@ Examples:
               await electron.disconnectFirebase();
               await electron.connectFirebase({
                 serviceAccountPath: selectedProject.serviceAccountPath,
-                databaseId: selectedProject.databaseId,
+                databaseId: getServiceAccountConnectDatabaseId(selectedProject),
               });
               result = await electron.getDocuments({
                 collectionPath,
@@ -279,6 +284,7 @@ Examples:
             result = await electron.googleGetDocument({
               projectId: selectedProject.projectId,
               documentPath,
+              databaseId: getGoogleApiDatabaseId(selectedProject, selectedProject.activeFirestoreDatabaseId),
             });
           } else {
             // Service account project - connect first
@@ -288,7 +294,7 @@ Examples:
             await electron.disconnectFirebase();
             await electron.connectFirebase({
               serviceAccountPath: selectedProject.serviceAccountPath,
-              databaseId: selectedProject.databaseId,
+              databaseId: getServiceAccountConnectDatabaseId(selectedProject),
             });
             result = await electron.getDocument(documentPath);
           }

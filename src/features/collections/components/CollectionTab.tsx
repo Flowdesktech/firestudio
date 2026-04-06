@@ -44,6 +44,7 @@ import {
 } from '../store/collectionSlice';
 import { RootState, AppDispatch } from '../../../app/store';
 import { Project } from '../../projects/store/projectsSlice';
+import { buildCollectionStateKey } from '../../projects/utils/firestoreDatabaseUtils';
 import { FirestoreValue } from '../../../shared/utils/firestoreUtils';
 import { isFirestoreTimestamp, isIsoDateString, isUnixTimestampMs } from '../../../shared/utils/dateUtils';
 
@@ -85,13 +86,15 @@ interface EditingCell {
 interface CollectionTabProps {
   project: Project;
   collectionPath: string;
+  /** Service account: FirestoreDatabase.id for this tab */
+  firestoreDatabaseId?: string;
   showMessage?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 /**
  * CollectionTab - Main component for Firestore collection management
  */
-const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, showMessage }) => {
+const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, firestoreDatabaseId, showMessage }) => {
   // Theme
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
@@ -107,7 +110,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
   );
 
   // Collection Data (Redux)
-  const collectionKey = `${project.projectId}:${collectionPath}`;
+  const collectionKey = buildCollectionStateKey(project, collectionPath, firestoreDatabaseId);
   const collectionData = useSelector((state: RootState) => selectCollectionData(state, collectionKey));
   const {
     documents = [],
@@ -157,7 +160,9 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       if (initialFetchRef.current.inFlight || initialFetchRef.current.done) return;
       initialFetchRef.current.inFlight = true;
       try {
-        await dispatch(fetchDocuments({ project, collection: collectionPath, key: collectionKey })).unwrap();
+        await dispatch(
+          fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+        ).unwrap();
         initialFetchRef.current.done = true;
       } catch (error: unknown) {
         if (!isMounted) return;
@@ -170,7 +175,16 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
     return () => {
       isMounted = false;
     };
-  }, [dispatch, collectionKey, project, collectionPath, defaultDocLimit, showError, collectionData?.lastFetchedAt]);
+  }, [
+    dispatch,
+    collectionKey,
+    project,
+    collectionPath,
+    defaultDocLimit,
+    showError,
+    collectionData?.lastFetchedAt,
+    firestoreDatabaseId,
+  ]);
 
   // Wrapped Setters
   const setLimit = useCallback(
@@ -223,20 +237,24 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
   // Load Documents
   const loadDocuments = useCallback(async () => {
     try {
-      await dispatch(fetchDocuments({ project, collection: collectionPath, key: collectionKey })).unwrap();
+      await dispatch(
+        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+      ).unwrap();
     } catch (error) {
       showError(error);
     }
-  }, [dispatch, project, collectionPath, collectionKey, showError]);
+  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, showError]);
 
   // Execute JS Query (Same thunk, just ensures state is ready)
   const executeJsQuery = useCallback(async () => {
     try {
-      await dispatch(fetchDocuments({ project, collection: collectionPath, key: collectionKey })).unwrap();
+      await dispatch(
+        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+      ).unwrap();
     } catch (error) {
       showError(error);
     }
-  }, [dispatch, project, collectionPath, collectionKey, showError]);
+  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, showError]);
 
   // Import/Export Wrappers
   const saveDocumentsFromJson = useCallback(
@@ -244,7 +262,9 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       // We can use a thunk or loop updates. For now loop updates or importCollection if it supports overwrites?
       // importCollection does overwrite (setDocument).
       // Let's use importCollection
-      const result = await dispatch(importCollection({ project, collection: collectionPath, data: docsData })).unwrap();
+      const result = await dispatch(
+        importCollection({ project, collection: collectionPath, data: docsData, firestoreDatabaseId }),
+      ).unwrap();
       if (result?.count != null) {
         showMessage?.(`Imported ${result.count} documents`, 'success');
       } else {
@@ -252,7 +272,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       }
       await loadDocuments();
     },
-    [dispatch, project, collectionPath, loadDocuments, showMessage],
+    [dispatch, project, collectionPath, loadDocuments, showMessage, firestoreDatabaseId],
   );
 
   const handleExportCollection = useCallback(async () => {
@@ -280,7 +300,9 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       return { success: true };
     } else {
       // SA Export
-      const result = await dispatch(exportCollection({ project, collection: collectionPath })).unwrap();
+      const result = await dispatch(
+        exportCollection({ project, collection: collectionPath, firestoreDatabaseId }),
+      ).unwrap();
       if (result?.filePath) {
         showMessage?.(`Exported to ${result.filePath}`, 'success');
       } else if (result?.success) {
@@ -288,7 +310,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       }
       return result;
     }
-  }, [dispatch, project, collectionPath, documents, showMessage]);
+  }, [dispatch, project, collectionPath, firestoreDatabaseId, documents, showMessage]);
 
   const handleImportDocuments = useCallback(async () => {
     if (project.authMethod === 'google') {
@@ -306,7 +328,9 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
           try {
             const text = await file.text();
             const data = JSON.parse(text) as Record<string, DocumentData>;
-            await dispatch(importCollection({ project, collection: collectionPath, data })).unwrap();
+            await dispatch(
+              importCollection({ project, collection: collectionPath, data, firestoreDatabaseId }),
+            ).unwrap();
             await loadDocuments();
             resolve({ success: true });
           } catch (err: unknown) {
@@ -318,13 +342,15 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
         input.click();
       });
     } else {
-      const res = await dispatch(importCollection({ project, collection: collectionPath })).unwrap(); // SA import logic in thunk calls API which opens dialog?
+      const res = await dispatch(
+        importCollection({ project, collection: collectionPath, firestoreDatabaseId }),
+      ).unwrap();
       // Wait, SA import in thunk uses window.electronAPI.importDocuments which usually opens dialog in main process.
       // But thunk I wrote calls importDocuments(collection).
       await loadDocuments();
       return res;
     }
-  }, [dispatch, project, collectionPath, loadDocuments, showMessage]);
+  }, [dispatch, project, collectionPath, firestoreDatabaseId, loadDocuments, showMessage]);
 
   // Helper ref for shortcuts
   const queryModeRef = useRef(queryMode);
@@ -494,7 +520,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
             project,
             collection: collectionPath,
             docId,
-            docData: newData, // The thunk expects docData... wait.
+            docData: newData,
+            firestoreDatabaseId,
           }),
         ).unwrap();
         showMessage?.(`Updated document ${docId}`, 'success');
@@ -504,7 +531,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
 
       setEditingCell(null);
     },
-    [editingCell, editValue, documents, dispatch, project, collectionPath, showMessage, showError],
+    [editingCell, editValue, documents, dispatch, project, collectionPath, firestoreDatabaseId, showMessage, showError],
   );
 
   const handleCellKeyDown = useCallback(
@@ -543,7 +570,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
           project,
           collection: collectionPath,
           docId: newDocId,
-          docData: newDocData, // string
+          docData: newDocData,
+          firestoreDatabaseId,
         }),
       ).unwrap();
 
@@ -558,7 +586,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
     } catch (error: unknown) {
       showError(error);
     }
-  }, [newDocId, newDocData, dispatch, project, collectionPath, showMessage, showError]);
+  }, [newDocId, newDocData, dispatch, project, collectionPath, firestoreDatabaseId, showMessage, showError]);
 
   // Delete Selected Documents Handler
   const handleDeleteSelected = useCallback(async () => {
@@ -578,6 +606,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
               project,
               collection: collectionPath,
               docId,
+              firestoreDatabaseId,
             }),
           ).unwrap();
           successCount++;
@@ -603,7 +632,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
     } finally {
       setDeleteLoading(false);
     }
-  }, [selectedRows, project, collectionPath, showMessage, dispatch, showError]);
+  }, [selectedRows, project, collectionPath, firestoreDatabaseId, showMessage, dispatch, showError]);
 
   // Type utility wrappers for child components
   const getType = useCallback((value: FirestoreValue) => getValueType(value), []);

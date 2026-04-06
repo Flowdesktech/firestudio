@@ -2,9 +2,16 @@ import { useSelector, useDispatch } from 'react-redux';
 import { closeDialog, selectActiveDialog, addTab, DialogState } from '../../app/store/slices/uiSlice';
 import {
   selectGoogleSignInLoading,
+  selectProjectsLoading,
   connectServiceAccount,
   signInWithGoogle,
+  addFirestoreDatabase,
+  addGoogleFirestoreDatabase,
 } from '../../features/projects/store/projectsSlice';
+import {
+  getActiveFirestoreDatabase,
+  getFirestoreDatabaseDisplay,
+} from '../../features/projects/utils/firestoreDatabaseUtils';
 import { AppDispatch } from '../store';
 import { Project } from '../../features/projects/store/projectsSlice';
 import { addLog } from '../../app/store/slices/logsSlice';
@@ -17,6 +24,7 @@ import RenameCollectionDialog from '../../features/collections/components/dialog
 import DeleteCollectionDialog from '../../features/collections/components/dialogs/DeleteCollectionDialog';
 import ApiDisabledDialog from '../../features/collections/components/dialogs/ApiDisabledDialog';
 import ConnectionDialog from '../../features/projects/components/ConnectionDialog';
+import AddFirestoreDatabaseDialog from '../../features/projects/components/AddFirestoreDatabaseDialog';
 import SettingsDialog from './SettingsDialog';
 
 // We need to import the hooks logic for actions that execute inside dialogs
@@ -39,6 +47,7 @@ interface GlobalDialogProps {
   collection?: string;
   projectId?: string;
   apiUrl?: string;
+  firestoreDatabaseId?: string;
 }
 
 export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalDialogsProps) {
@@ -46,6 +55,7 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
   const dispatch = useDispatch<AppDispatch>();
   const activeDialog = useSelector(selectActiveDialog);
   const googleSignInLoading = useSelector(selectGoogleSignInLoading);
+  const projectsLoading = useSelector(selectProjectsLoading);
 
   if (!activeDialog) return null;
 
@@ -58,14 +68,22 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
   // Helper to open a collection tab after creation (mimicking original App.jsx behavior)
   // Used for AddCollection which also opens the tab
   const handleOpenCollection = (project: Project, collection: string) => {
+    const fd =
+      project.authMethod === 'serviceAccount' || project.authMethod === 'google'
+        ? getActiveFirestoreDatabase(project)
+        : null;
+    const id = fd ? `${project.id}-${fd.id}-${collection}` : `${project.id}-${collection}`;
+    const databaseLabel = fd ? getFirestoreDatabaseDisplay(fd) : undefined;
     dispatch(
       addTab({
-        id: `${project.id}-${collection}`,
+        id,
         projectId: project.id,
         projectName: project.projectId,
         collectionPath: collection,
-        label: collection,
+        label: databaseLabel ? `${databaseLabel} · ${collection}` : collection,
         type: 'collection',
+        firestoreDatabaseId: fd?.id,
+        databaseLabel,
       }),
     );
   };
@@ -76,12 +94,19 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
       <ConnectionDialog
         open={type === 'CONNECTION'}
         onClose={handleClose}
-        onConnect={async (path: string, databaseId: string) => {
+        onConnect={async (path: string) => {
           try {
-            const project = await dispatch(
-              connectServiceAccount({ serviceAccountPath: path, databaseId: databaseId || undefined }),
-            ).unwrap();
-            dispatch(addLog({ type: 'success', message: `Connected to ${project.projectId}` }));
+            const result = await dispatch(connectServiceAccount({ serviceAccountPath: path })).unwrap();
+            if (result.mode === 'create') {
+              dispatch(addLog({ type: 'success', message: `Connected to ${result.project.projectId}` }));
+            } else {
+              dispatch(
+                addLog({
+                  type: 'success',
+                  message: `Added Firestore database "${result.newDatabase.databaseId}" to ${result.projectId}`,
+                }),
+              );
+            }
             handleClose();
           } catch (err: unknown) {
             dispatch(addLog({ type: 'error', message: getErrorMessage(err) }));
@@ -98,7 +123,28 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
             dispatch(addLog({ type: 'error', message: getErrorMessage(error) }));
           }
         }}
-        loading={googleSignInLoading}
+        loading={googleSignInLoading || projectsLoading}
+      />
+
+      <AddFirestoreDatabaseDialog
+        open={type === 'ADD_FIRESTORE_DATABASE'}
+        onClose={handleClose}
+        projectIdLabel={(props.project as Project)?.projectId ?? ''}
+        loading={projectsLoading}
+        onSubmit={async (databaseId: string, label: string) => {
+          const project = props.project as Project;
+          try {
+            if (project.authMethod === 'google') {
+              await dispatch(addGoogleFirestoreDatabase({ projectId: project.id, databaseId, label })).unwrap();
+            } else {
+              await dispatch(addFirestoreDatabase({ projectId: project.id, databaseId, label })).unwrap();
+            }
+            dispatch(addLog({ type: 'success', message: `Added Firestore database "${databaseId}"` }));
+            handleClose();
+          } catch (err: unknown) {
+            dispatch(addLog({ type: 'error', message: getErrorMessage(err) }));
+          }
+        }}
       />
 
       <SettingsDialog open={type === 'SETTINGS'} onClose={handleClose} />
@@ -116,6 +162,7 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
                 name,
                 docId,
                 docData,
+                firestoreDatabaseId: getActiveFirestoreDatabase(project)?.id,
               }),
             ).unwrap();
             if (createdName) {
@@ -144,6 +191,7 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
                 collection,
                 docId,
                 docData,
+                firestoreDatabaseId: props.firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
               }),
             ).unwrap();
             if (createdId) {
@@ -170,6 +218,7 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
                 project,
                 currentPath: collection,
                 targetPath,
+                firestoreDatabaseId: getActiveFirestoreDatabase(project)?.id,
               }),
             ).unwrap();
             dispatch(addLog({ type: 'success', message: `Renamed collection to ${targetPath}` }));
@@ -192,6 +241,7 @@ export default function GlobalDialogs({ onShowMessage: _onShowMessage }: GlobalD
               deleteCollection({
                 project,
                 collection,
+                firestoreDatabaseId: props.firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
               }),
             ).unwrap();
             dispatch(addLog({ type: 'success', message: `Deleted collection "${collection}"` }));

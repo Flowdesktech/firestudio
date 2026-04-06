@@ -9,9 +9,15 @@ import {
   refreshGoogleAccountProjects,
   removeProject,
   selectProjectsLoading,
+  setActiveFirestoreDatabase,
   Project,
   GoogleAccount,
 } from './features/projects/store/projectsSlice';
+import {
+  buildCollectionStateKey,
+  getActiveFirestoreDatabase,
+  getFirestoreDatabaseDisplay,
+} from './features/projects/utils/firestoreDatabaseUtils';
 import {
   selectOpenTabs,
   selectActiveTabId,
@@ -149,17 +155,30 @@ function FirestudioApp() {
   }, [dispatch]);
 
   // Tab Handlers
-  const onOpenCollection = (project: Project | GoogleAccount, collectionPath: string) => {
+  const onOpenCollection = (
+    project: Project | GoogleAccount,
+    collectionPath: string,
+    firestoreDatabaseId?: string,
+    databaseLabel?: string,
+  ) => {
     if (isGoogleAccount(project)) return;
-    const id = `${project.id}-${collectionPath}`;
+    const id = firestoreDatabaseId
+      ? `${project.id}-${firestoreDatabaseId}-${collectionPath}`
+      : `${project.id}-${collectionPath}`;
+    const label =
+      databaseLabel && !isGoogleAccount(project) && project.authMethod === 'serviceAccount'
+        ? `${databaseLabel} · ${collectionPath}`
+        : collectionPath;
     dispatch(
       addTab({
         id,
         projectId: project.id,
         projectName: project.projectId,
-        label: collectionPath, // normalized to title/label
+        label,
         type: 'collection',
         collectionPath,
+        firestoreDatabaseId,
+        databaseLabel,
       }),
     );
   };
@@ -216,9 +235,10 @@ function FirestudioApp() {
       return;
     }
 
-    onOpenCollection(project, query.collectionPath);
+    const fd = project.authMethod === 'serviceAccount' ? getActiveFirestoreDatabase(project) : null;
+    onOpenCollection(project, query.collectionPath, fd?.id, fd ? getFirestoreDatabaseDisplay(fd) : undefined);
 
-    const collectionKey = `${project.projectId}:${query.collectionPath}`;
+    const collectionKey = buildCollectionStateKey(project, query.collectionPath, fd?.id);
     dispatch(initCollectionState({ key: collectionKey, defaultLimit: settings.defaultDocLimit || 50 }));
     dispatch(setCollectionQueryMode({ key: collectionKey, mode: 'js' }));
     dispatch(setCollectionJsQuery({ key: collectionKey, query: query.code }));
@@ -231,6 +251,10 @@ function FirestudioApp() {
     activeTab,
     onSelectProject: (projectId: string) => dispatch(setSelectedProject(projectId)),
     onOpenCollection,
+    onAddFirestoreDatabase: (project: Project) =>
+      dispatch(openDialog({ type: 'ADD_FIRESTORE_DATABASE', props: { project } })),
+    onSetActiveFirestoreDatabase: (projectId: string, firestoreDatabaseId: string) =>
+      dispatch(setActiveFirestoreDatabase({ projectId, firestoreDatabaseId })),
     onOpenStorage: (item: Project | GoogleAccount) => {
       const project = ensureProject(item);
       if (!project) return;
@@ -265,6 +289,17 @@ function FirestudioApp() {
       const project = ensureProject(item);
       if (!project) return;
       dispatch(openDialog({ type: 'ADD_COLLECTION', props: { project } }));
+    },
+    onRefreshFirestoreDatabase: (project: Project, firestoreDatabaseId: string) => {
+      dispatch(addLog({ type: 'info', message: 'Refreshing collections…' }));
+      dispatch(refreshCollections({ project, firestoreDatabaseId }))
+        .unwrap()
+        .then(() => {
+          dispatch(addLog({ type: 'success', message: 'Collections refreshed' }));
+        })
+        .catch((error) => {
+          dispatch(addLog({ type: 'error', message: getErrorMessage(error) }));
+        });
     },
     onRefreshCollections: (item: Project | GoogleAccount) => {
       if (isGoogleAccount(item)) {
@@ -305,7 +340,15 @@ function FirestudioApp() {
         );
       }
       dispatch(addLog({ type: 'info', message: `Refreshing collections for ${item.projectId}...` }));
-      dispatch(refreshCollections({ project: item, refreshToken }))
+      dispatch(
+        refreshCollections({
+          project: item,
+          refreshToken,
+          ...(item.authMethod === 'serviceAccount'
+            ? { firestoreDatabaseId: getActiveFirestoreDatabase(item)?.id }
+            : {}),
+        }),
+      )
         .unwrap()
         .then(() => {
           dispatch(addLog({ type: 'success', message: `Refreshed collections for ${item.projectId}` }));
@@ -330,24 +373,24 @@ function FirestudioApp() {
     },
 
     // Document handlers
-    onAddDocument: (item: Project | GoogleAccount, collection: string) => {
+    onAddDocument: (item: Project | GoogleAccount, collection: string, firestoreDatabaseId?: string) => {
       const project = ensureProject(item);
       if (!project) return;
-      dispatch(openDialog({ type: 'ADD_DOCUMENT', props: { project, collection } }));
+      dispatch(openDialog({ type: 'ADD_DOCUMENT', props: { project, collection, firestoreDatabaseId } }));
     },
-    onRenameCollection: (item: Project | GoogleAccount, collection: string) => {
+    onRenameCollection: (item: Project | GoogleAccount, collection: string, firestoreDatabaseId?: string) => {
       const project = ensureProject(item);
       if (!project) return;
-      dispatch(openDialog({ type: 'RENAME_COLLECTION', props: { project, collection } }));
+      dispatch(openDialog({ type: 'RENAME_COLLECTION', props: { project, collection, firestoreDatabaseId } }));
     },
-    onDeleteCollection: (item: Project | GoogleAccount, collection: string) => {
+    onDeleteCollection: (item: Project | GoogleAccount, collection: string, firestoreDatabaseId?: string) => {
       const project = ensureProject(item);
       if (!project) return;
-      dispatch(openDialog({ type: 'DELETE_COLLECTION', props: { project, collection } }));
+      dispatch(openDialog({ type: 'DELETE_COLLECTION', props: { project, collection, firestoreDatabaseId } }));
     },
 
     // Export / Misc - using Redux thunks
-    onExportCollection: (item: Project | GoogleAccount, collection: string) => {
+    onExportCollection: (item: Project | GoogleAccount, collection: string, firestoreDatabaseId?: string) => {
       const project = ensureProject(item);
       if (!project) return;
       dispatch(
@@ -359,7 +402,13 @@ function FirestudioApp() {
               : `Opening export dialog for "${collection}"...`,
         }),
       );
-      dispatch(exportSingleCollection({ project, collection }))
+      dispatch(
+        exportSingleCollection({
+          project,
+          collection,
+          firestoreDatabaseId: firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
+        }),
+      )
         .unwrap()
         .then((result) => {
           if (result?.count === 0) {
@@ -418,10 +467,16 @@ function FirestudioApp() {
           dispatch(addLog({ type: 'error', message: getErrorMessage(error) }));
         });
     },
-    onEstimateDocCount: (item: Project | GoogleAccount, collection: string) => {
+    onEstimateDocCount: (item: Project | GoogleAccount, collection: string, firestoreDatabaseId?: string) => {
       const project = ensureProject(item);
       if (!project) return;
-      dispatch(estimateDocCount({ project, collection }))
+      dispatch(
+        estimateDocCount({
+          project,
+          collection,
+          firestoreDatabaseId: firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
+        }),
+      )
         .unwrap()
         .then(({ count }) => notificationService.showDocumentCount(collection, count))
         .catch((error) => {
@@ -601,8 +656,8 @@ function FirestudioApp() {
                   key={activeTab.id}
                   project={project}
                   collectionPath={activeTab.collectionPath}
+                  firestoreDatabaseId={activeTab.firestoreDatabaseId}
                   showMessage={(msg: string, type: MessageType) => dispatch(addLog({ type, message: msg }))}
-                  // Pass down handlers that map to Redux actions...
                 />
               );
             }

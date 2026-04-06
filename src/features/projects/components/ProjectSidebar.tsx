@@ -23,11 +23,19 @@ export interface ProjectSidebarProps {
   activeTab?: Tab | null;
   // onSelectProject, // Unusedtring;
   onSelectProject: (projectId: string) => void;
-  onOpenCollection: (project: Project | GoogleAccount, collectionId: string) => void;
+  onOpenCollection: (
+    project: Project | GoogleAccount,
+    collectionId: string,
+    firestoreDatabaseId?: string,
+    databaseLabel?: string,
+  ) => void;
   onOpenStorage: (project: Project | GoogleAccount) => void;
   onOpenAuth: (project: Project | GoogleAccount) => void;
   onAddProject: () => void;
   onAddCollection: (project: Project | GoogleAccount) => void;
+  onAddFirestoreDatabase: (project: Project) => void;
+  onSetActiveFirestoreDatabase: (projectId: string, firestoreDatabaseId: string) => void;
+  onRefreshFirestoreDatabase?: (project: Project, firestoreDatabaseId: string) => void;
   onDisconnectProject: (project: Project | GoogleAccount) => void;
   onDisconnectAccount: (account: GoogleAccount) => void;
   onRefreshCollections: (project: Project | GoogleAccount) => void;
@@ -35,11 +43,11 @@ export interface ProjectSidebarProps {
   onRevealInFirebaseConsole: (project: Project | GoogleAccount) => void;
   onCopyProjectId: (project: Project | GoogleAccount) => void;
   // Collection menu handlers
-  onAddDocument?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onRenameCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onDeleteCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onExportCollection?: (project: Project | GoogleAccount, collectionId: string) => void;
-  onEstimateDocCount?: (project: Project | GoogleAccount, collectionId: string) => void;
+  onAddDocument?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onRenameCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onDeleteCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onExportCollection?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
+  onEstimateDocCount?: (project: Project | GoogleAccount, collectionId: string, firestoreDatabaseId?: string) => void;
   onCopyCollectionId?: (collectionId: string) => void;
   onCopyResourcePath?: (project: Project | GoogleAccount, collectionId: string) => void;
   onRevealCollectionInConsole?: (project: Project | GoogleAccount, collectionId: string) => void;
@@ -58,6 +66,9 @@ function ProjectSidebar({
   onOpenAuth,
   onAddProject,
   onAddCollection,
+  onAddFirestoreDatabase,
+  onSetActiveFirestoreDatabase,
+  onRefreshFirestoreDatabase,
   onDisconnectProject,
   onDisconnectAccount,
   onRefreshCollections,
@@ -136,21 +147,31 @@ function ProjectSidebar({
 
   const handleContextMenu = (
     e: React.MouseEvent,
-    target: Project | { project: Project | GoogleAccount; collection: string },
+    target:
+      | MenuTarget
+      | Project
+      | { project: Project | GoogleAccount; collection: string; firestoreDatabaseId?: string },
     type: Exclude<MenuTargetType, 'account'>,
   ) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenuPosition({ top: e.clientY, left: e.clientX });
-    setMenuAnchor(null); // Clear any existing anchor
+    setMenuAnchor(null);
     if (type === 'collection') {
-      const collectionTarget = target as { project: Project | GoogleAccount; collection: string };
+      const collectionTarget = target as {
+        project: Project | GoogleAccount;
+        collection: string;
+        firestoreDatabaseId?: string;
+      };
       setMenuTarget({ menuType: 'collection', ...collectionTarget });
       return;
     }
-    // Type safety: non-collection context menus only apply to projects
+    if (type === 'firestoreRoot' || type === 'firestoreDatabase') {
+      setMenuTarget(target as MenuTarget);
+      return;
+    }
     if ('collection' in target) return;
-    setMenuTarget({ ...target, menuType: type });
+    setMenuTarget({ ...(target as Project), menuType: type });
   };
 
   const handleCloseMenu = () => {
@@ -238,6 +259,8 @@ function ProjectSidebar({
         activeTab={activeTab} // Passed even if unused in component logic, required by interface
         onOpenCollection={onOpenCollection}
         onAddCollection={onAddCollection}
+        onAddFirestoreDatabase={onAddFirestoreDatabase}
+        onSetActiveFirestoreDatabase={onSetActiveFirestoreDatabase}
         onOpenStorage={onOpenStorage}
         onOpenAuth={onOpenAuth}
         handleReconnect={handleReconnect}
@@ -356,6 +379,8 @@ function ProjectSidebar({
         onCopyResourcePath={onCopyResourcePath}
         onRevealCollectionInConsole={onRevealCollectionInConsole}
         onDisconnectProject={onDisconnectProject}
+        onAddFirestoreDatabase={onAddFirestoreDatabase}
+        onRefreshFirestoreDatabase={onRefreshFirestoreDatabase}
       />
     </Box>
   );
