@@ -144,11 +144,19 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R artifacts
 
-      # Release title = packaged app / installer version (same as tag, e.g. v1.7.0)
+      # Release title = packaged app / installer version (same as tag, e.g. v1.7.0).
+      # `body` is prepended before GitHub's auto-generated notes when `generate_release_notes` is true.
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Firestudio ${{ github.ref_name }}
+          body: |
+            ### Setup / app version
+
+            **${{ github.ref_name }}** — matches the built installers and `package.json` at this tag.
+
+            **Auto-update:** These assets include `latest.yml` (and related metadata) for **electron-updater**. The app checks GitHub Releases on startup and once per day; updates download and install only after you confirm. On **Windows**, use the **NSIS Setup** `.exe` for in-app updates (not the portable build).
+
           draft: false
           prerelease: false
           generate_release_notes: true
