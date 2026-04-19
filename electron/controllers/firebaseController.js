@@ -35,18 +35,28 @@ function registerHandlers() {
       const serviceAccountPath = typeof params === 'string' ? params : params.serviceAccountPath;
       const databaseId = typeof params === 'string' ? undefined : params.databaseId;
 
-      if (admin) {
-        await admin.app().delete();
+      const adminSdk = require('firebase-admin');
+
+      // Never call app().delete() unless an app exists — after a failed connect, `admin` may
+      // still reference the SDK module while no default app was initialized, which throws:
+      // "The default Firebase app does not exist".
+      const existingApps = [...adminSdk.apps];
+      for (const appInstance of existingApps) {
+        try {
+          await appInstance.delete();
+        } catch (e) {
+          void e;
+        }
       }
 
       const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      admin = require('firebase-admin');
 
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      adminSdk.initializeApp({
+        credential: adminSdk.credential.cert(serviceAccount),
       });
 
-      db = admin.firestore();
+      admin = adminSdk;
+      db = adminSdk.firestore();
 
       if (databaseId) {
         db.settings({ databaseId });
@@ -59,6 +69,24 @@ function registerHandlers() {
 
       return { success: true, projectId: serviceAccount.project_id, databaseId };
     } catch (error) {
+      admin = null;
+      db = null;
+      try {
+        const adminSdk = require('firebase-admin');
+        const leftover = [...adminSdk.apps];
+        for (const appInstance of leftover) {
+          try {
+            await appInstance.delete();
+          } catch (e) {
+            void e;
+          }
+        }
+      } catch (e2) {
+        void e2;
+      }
+      if (onConnectionChange) {
+        onConnectionChange(null, null);
+      }
       return { success: false, error: error.message };
     }
   });
@@ -66,15 +94,20 @@ function registerHandlers() {
   // Disconnect from Firebase
   ipcMain.handle('firebase:disconnect', async () => {
     try {
-      if (admin) {
-        await admin.app().delete();
-        admin = null;
-        db = null;
-
-        // Notify other controllers about the disconnection
-        if (onConnectionChange) {
-          onConnectionChange(null, null);
+      const adminSdk = admin || require('firebase-admin');
+      const existingApps = [...adminSdk.apps];
+      for (const appInstance of existingApps) {
+        try {
+          await appInstance.delete();
+        } catch (e) {
+          void e;
         }
+      }
+      admin = null;
+      db = null;
+
+      if (onConnectionChange) {
+        onConnectionChange(null, null);
       }
       return { success: true };
     } catch (error) {

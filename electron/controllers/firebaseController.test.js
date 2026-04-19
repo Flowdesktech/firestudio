@@ -8,6 +8,8 @@ const readFileSyncMock = vi.fn();
 const handleMock = vi.fn();
 const mockAppDelete = vi.fn().mockResolvedValue(undefined);
 const mockSettings = vi.fn();
+/** Simulates firebase-admin `apps` after initializeApp */
+const mockAppsList = [];
 
 // Inject electron mock into require cache
 require_.cache[require_.resolve('electron')] = {
@@ -37,10 +39,17 @@ require_.cache[firebaseAdminPath] = {
   filename: firebaseAdminPath,
   loaded: true,
   exports: {
-    initializeApp: vi.fn(),
+    initializeApp: vi.fn(() => {
+      const app = { delete: mockAppDelete };
+      mockAppsList.push(app);
+      return app;
+    }),
     credential: { cert: vi.fn().mockReturnValue('mock-credential') },
     firestore: vi.fn().mockReturnValue({ settings: mockSettings }),
-    app: vi.fn().mockReturnValue({ delete: mockAppDelete }),
+    app: vi.fn(() => mockAppsList[0]),
+    get apps() {
+      return mockAppsList;
+    },
   },
 };
 
@@ -58,9 +67,13 @@ for (const [channel, handler] of handleMock.mock.calls) {
 }
 
 describe('firebaseController', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     readFileSyncMock.mockReset();
     mockAppDelete.mockClear();
+    mockAppsList.length = 0;
+    if (handlers['firebase:disconnect']) {
+      await handlers['firebase:disconnect']();
+    }
   });
 
   it('connects with a valid service account path', async () => {
@@ -109,6 +122,23 @@ describe('firebaseController', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('ENOENT');
+  });
+
+  it('connect succeeds after a prior failed connect (no phantom app().delete)', async () => {
+    readFileSyncMock.mockImplementationOnce(() => {
+      throw new Error('ENOENT first');
+    });
+    const failResult = await handlers['firebase:connect'](null, {
+      serviceAccountPath: '/missing.json',
+    });
+    expect(failResult.success).toBe(false);
+
+    const serviceAccount = { project_id: 'recovery-project' };
+    readFileSyncMock.mockReturnValue(JSON.stringify(serviceAccount));
+    const okResult = await handlers['firebase:connect'](null, {
+      serviceAccountPath: '/path/to/sa.json',
+    });
+    expect(okResult).toEqual({ success: true, projectId: 'recovery-project', databaseId: undefined });
   });
 
   it('disconnects when connected', async () => {

@@ -12,6 +12,7 @@ const path = require('path');
 // Modules
 const { createAppMenu } = require('./menu');
 const controllers = require('./controllers');
+const { setupAutoUpdate, stopDailyUpdateCheck } = require('./autoUpdate');
 
 // ============================================
 // Configuration
@@ -94,6 +95,7 @@ app.whenReady().then(() => {
   createAppMenu();
   createWindow();
   controllers.registerAllHandlers();
+  setupAutoUpdate();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -103,7 +105,12 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  stopDailyUpdateCheck();
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  stopDailyUpdateCheck();
 });

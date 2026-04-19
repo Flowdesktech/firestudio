@@ -41,12 +41,12 @@ jobs:
           CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
 
+      # Upload full `release/` so GitHub has NSIS + latest.yml + blockmap for electron-updater
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-builds
-          path: |
-            release/*.exe
+          path: release
           retention-days: 5
 
   build-mac:
@@ -91,9 +91,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-builds
-          path: |
-            release/*.dmg
-            release/*.zip
+          path: release
           retention-days: 5
 
   build-linux:
@@ -126,10 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-builds
-          path: |
-            release/*.AppImage
-            release/*.deb
-            release/*.tar.gz
+          path: release
           retention-days: 5
 
   create-release:
@@ -149,9 +144,11 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R artifacts
 
+      # Release title = packaged app / installer version (same as tag, e.g. v1.7.0)
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          name: Firestudio ${{ github.ref_name }}
           draft: false
           prerelease: false
           generate_release_notes: true

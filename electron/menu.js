@@ -4,6 +4,7 @@
  */
 
 const { BrowserWindow, Menu, dialog, shell, app } = require('electron');
+const { checkForUpdatesManual } = require('./autoUpdate');
 
 // App Configuration - get version from package.json
 const APP_VERSION = app.getVersion();
@@ -69,6 +70,13 @@ function createAppMenu() {
     {
       label: 'Help',
       submenu: [
+        {
+          label: 'Check for Updates…',
+          click: () => {
+            checkForUpdatesManual();
+          },
+        },
+        { type: 'separator' },
         {
           label: 'About',
           click: () => {
