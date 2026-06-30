@@ -55,6 +55,16 @@ const mockElectronAPI: ElectronAPI = {
     return { success: false, error: 'Requires Electron mode' };
   },
 
+  // Emulators
+  scanEmulatorsHub: async () => {
+    console.warn('[Mock] scanEmulatorsHub requires Electron');
+    return { success: false, error: 'Requires Electron mode' };
+  },
+  scanEmulatorsConfig: async () => {
+    console.warn('[Mock] scanEmulatorsConfig requires Electron');
+    return { success: false, error: 'Requires Electron mode' };
+  },
+
   // Dialog
   openFileDialog: async () => {
     console.warn('[Mock] File dialog requires Electron');

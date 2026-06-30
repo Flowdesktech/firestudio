@@ -9,12 +9,20 @@ ipcRenderer.on('open-settings-dialog', () => {
   window.dispatchEvent(new CustomEvent('open-settings-dialog'));
 });
 
+ipcRenderer.on('scan-emulators', () => {
+  window.dispatchEvent(new CustomEvent('scan-emulators'));
+});
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // Firebase connection
   connectFirebase: (params) => ipcRenderer.invoke('firebase:connect', params),
   disconnectFirebase: () => ipcRenderer.invoke('firebase:disconnect'),
+
+  // Emulators
+  scanEmulatorsHub: () => ipcRenderer.invoke('emulators:scanHub'),
+  scanEmulatorsConfig: () => ipcRenderer.invoke('emulators:scanConfig'),
 
   // Firestore operations
   getCollections: () => ipcRenderer.invoke('firestore:getCollections'),

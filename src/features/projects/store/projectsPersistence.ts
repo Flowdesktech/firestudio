@@ -50,6 +50,18 @@ export const saveProjectsToStorage = (projects: (Project | GoogleAccount)[]) => 
               collections: proj.collections || [],
             })),
           };
+        } else if (isProject(p) && p.authMethod === 'emulator') {
+          return {
+            id: p.id,
+            projectId: p.projectId,
+            authMethod: p.authMethod,
+            emulatorHost: p.emulatorHost,
+            emulatorPort: p.emulatorPort,
+            emulatorServices: p.emulatorServices,
+            collections: p.collections || [],
+            firestoreDatabases: p.firestoreDatabases || [],
+            activeFirestoreDatabaseId: p.activeFirestoreDatabaseId,
+          };
         } else if (isProject(p) && p.authMethod === 'google') {
           return {
             id: p.id,
