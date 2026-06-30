@@ -55,6 +55,7 @@ import { formatFileSize, copyToClipboard, confirmAction } from '../../../shared/
 import { electronService } from '../../../shared/services/electronService';
 import { getServiceAccountConnectDatabaseId } from '../../projects/utils/firestoreDatabaseUtils';
 import type { Project as FirebaseProject } from '../../projects/store/projectsSlice';
+import { getConsoleUrl } from '../../projects/utils/projectConsoleUrl';
 
 // Types
 interface StorageItem {
@@ -127,6 +128,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
   const [bucketError, setBucketError] = useState<string | null>(null);
 
   const isGoogle = project?.authMethod === 'google';
+  const isEmulator = project?.authMethod === 'emulator';
   const loadingRef = useRef(false);
 
   const loadFiles = useCallback(async () => {
@@ -140,6 +142,21 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
       let result: { success: boolean; items?: StorageItem[]; error?: string };
       if (isGoogle) {
         result = await electron.googleStorageListFiles({ projectId: project.projectId, path: currentPath });
+      } else if (isEmulator) {
+        const storageHost = project.emulatorServices?.storage
+          ? `${project.emulatorServices.storage.host}:${project.emulatorServices.storage.port}`
+          : undefined;
+        const authHost = project.emulatorServices?.auth
+          ? `${project.emulatorServices.auth.host}:${project.emulatorServices.auth.port}`
+          : undefined;
+        await electron.disconnectFirebase();
+        await electron.connectFirebase({
+          projectId: project.projectId,
+          emulatorHost: project.emulatorHost,
+          authEmulatorHost: authHost,
+          storageEmulatorHost: storageHost,
+        });
+        result = await electron.storageListFiles({ path: currentPath });
       } else {
         await electron.disconnectFirebase();
         await electron.connectFirebase({
@@ -169,7 +186,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [project, currentPath, isGoogle, addLog, showMessage, electron]);
+  }, [project, currentPath, isGoogle, isEmulator, addLog, showMessage, electron]);
 
   useEffect(() => {
     if (project) loadFiles();
@@ -177,7 +194,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
 
   const openFirebaseConsole = () => {
     if (!project) return;
-    const url = `https://console.firebase.google.com/project/${project.projectId}/storage`;
+    const url = getConsoleUrl(project, 'storage');
     electronService.openExternal(url);
   };
 

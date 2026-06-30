@@ -18,6 +18,7 @@ import {
   getActiveFirestoreDatabase,
   getFirestoreDatabaseDisplay,
 } from './features/projects/utils/firestoreDatabaseUtils';
+import { getConsoleUrl } from './features/projects/utils/projectConsoleUrl';
 import {
   selectOpenTabs,
   selectActiveTabId,
@@ -503,13 +504,13 @@ function FirestudioApp() {
     onRevealInFirebaseConsole: (item: Project | GoogleAccount) => {
       const project = ensureProject(item);
       if (!project) return;
-      const url = `https://console.firebase.google.com/project/${project.projectId}/firestore`;
+      const url = getConsoleUrl(project, 'firestore');
       electronService.openExternal(url);
     },
     onRevealCollectionInConsole: (item: Project | GoogleAccount, collection: string) => {
       const project = ensureProject(item);
       if (!project) return;
-      const url = `https://console.firebase.google.com/project/${project.projectId}/firestore/data/${collection}`;
+      const url = getConsoleUrl(project, 'firestore', collection);
       electronService.openExternal(url);
     },
 

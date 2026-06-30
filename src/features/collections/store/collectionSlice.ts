@@ -57,6 +57,33 @@ const createAppAsyncThunk = createAsyncThunk.withTypes<{
   extra: ThunkExtra;
 }>();
 
+/**
+ * Reconnect to Firebase appropriate for the project type.
+ * Service account projects use credentials; emulator projects use host override.
+ */
+async function connectForProject(electron: ElectronAPI, project: Project, firestoreDatabaseId?: string): Promise<void> {
+  await electron.disconnectFirebase();
+  if (project.authMethod === 'emulator') {
+    const authHost = project.emulatorServices?.auth
+      ? `${project.emulatorServices.auth.host}:${project.emulatorServices.auth.port}`
+      : undefined;
+    const storageHost = project.emulatorServices?.storage
+      ? `${project.emulatorServices.storage.host}:${project.emulatorServices.storage.port}`
+      : undefined;
+    await electron.connectFirebase({
+      projectId: project.projectId,
+      emulatorHost: project.emulatorHost,
+      authEmulatorHost: authHost,
+      storageEmulatorHost: storageHost,
+    });
+  } else {
+    await electron.connectFirebase({
+      serviceAccountPath: project.serviceAccountPath!,
+      databaseId: getServiceAccountConnectDatabaseId(project, firestoreDatabaseId),
+    });
+  }
+}
+
 // Thunks
 
 interface ImportResult {
@@ -86,11 +113,7 @@ export const importCollection = createAppAsyncThunk<
       }
       return { count };
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(project, firestoreDatabaseId),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId);
 
       const result = await electron.importDocuments(collection);
       if (!result.success && result.error !== 'Import cancelled') throw new Error(result.error);
@@ -124,11 +147,7 @@ export const exportCollection = createAppAsyncThunk<
       // Component handles SA export (since it's server side, but initiated here).
       return rejectWithValue('Google export handled by component');
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(project, firestoreDatabaseId),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId);
       const result = await electron.exportCollection(collection);
 
       if (!result.success && result.error !== 'Export cancelled') {
@@ -184,12 +203,8 @@ export const fetchDocuments = createAppAsyncThunk<
             parseFirestoreFields,
           ) as unknown as Document[];
         } else {
-          // Service Account JS Query
-          await electron.disconnectFirebase();
-          await electron.connectFirebase({
-            serviceAccountPath: project.serviceAccountPath!,
-            databaseId: getServiceAccountConnectDatabaseId(project, firestoreDatabaseId),
-          });
+          // Service Account / Emulator JS Query
+          await connectForProject(electron, project, firestoreDatabaseId);
 
           const result = await electron.executeJsQuery({ collectionPath: collection, jsQuery });
           if (!result.success) throw new Error(result.error);
@@ -242,11 +257,7 @@ export const fetchDocuments = createAppAsyncThunk<
           // Google documents might need parsing if raw? checks suggest they are usually parsed by main process or clean.
           // googleGetDocuments usually returns formatted docs.
         } else {
-          await electron.disconnectFirebase();
-          await electron.connectFirebase({
-            serviceAccountPath: project.serviceAccountPath!,
-            databaseId: getServiceAccountConnectDatabaseId(project, firestoreDatabaseId),
-          });
+          await connectForProject(electron, project, firestoreDatabaseId);
 
           const res = await electron.getDocuments({
             collectionPath: collection,
@@ -299,14 +310,7 @@ export const createCollection = createAppAsyncThunk<
           databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
         });
       } else {
-        await electron.disconnectFirebase();
-        await electron.connectFirebase({
-          serviceAccountPath: project.serviceAccountPath!,
-          databaseId: getServiceAccountConnectDatabaseId(
-            project,
-            firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-          ),
-        });
+        await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
         result = await electron.createDocument({
           collectionPath: trimmedName,
           documentId: finalDocId,
@@ -364,14 +368,7 @@ export const addDocument = createAppAsyncThunk<
           databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
         });
       } else {
-        await electron.disconnectFirebase();
-        await electron.connectFirebase({
-          serviceAccountPath: project.serviceAccountPath!,
-          databaseId: getServiceAccountConnectDatabaseId(
-            project,
-            firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-          ),
-        });
+        await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
         result = await electron.createDocument({
           collectionPath: collection,
           documentId: finalDocId,
@@ -423,14 +420,7 @@ export const updateDocument = createAppAsyncThunk<
           databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
         });
       } else {
-        await electron.disconnectFirebase();
-        await electron.connectFirebase({
-          serviceAccountPath: project.serviceAccountPath!,
-          databaseId: getServiceAccountConnectDatabaseId(
-            project,
-            firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-          ),
-        });
+        await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
         result = await electron.setDocument({
           documentPath: `${collection}/${docId}`,
           data: docData,
@@ -464,14 +454,7 @@ export const deleteDocument = createAppAsyncThunk<
           databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
         });
       } else {
-        await electron.disconnectFirebase();
-        await electron.connectFirebase({
-          serviceAccountPath: project.serviceAccountPath!,
-          databaseId: getServiceAccountConnectDatabaseId(
-            project,
-            firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-          ),
-        });
+        await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
         result = await electron.deleteDocument(`${collection}/${docId}`);
       }
 
@@ -507,14 +490,7 @@ export const renameCollection = createAppAsyncThunk<
         });
         documents = res.success ? ((res.documents || []) as Document[]) : [];
       } else {
-        await electron.disconnectFirebase();
-        await electron.connectFirebase({
-          serviceAccountPath: project.serviceAccountPath!,
-          databaseId: getServiceAccountConnectDatabaseId(
-            project,
-            firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-          ),
-        });
+        await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
         const res = await electron.getDocuments({
           collectionPath: currentPath,
           limit: 10000,
@@ -630,14 +606,7 @@ export const estimateDocCount = createAppAsyncThunk<
         }
       }
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(
-          project,
-          firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-        ),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
       const res = await electron.query({
         collectionPath: collection,
         limit: 100000,
@@ -696,14 +665,7 @@ export const exportSingleCollection = createAppAsyncThunk<
       downloadJson(res.documents, `${collection.replace(/\//g, '_')}_export.json`);
       return { count: res.count };
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(
-          project,
-          firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-        ),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
       const res = await electron.exportCollection(collection);
       if (!res.success) throw new Error(res.error || 'Export failed');
       return res;
@@ -738,14 +700,7 @@ export const exportAllCollections = createAppAsyncThunk<
       downloadJson(res.data, `${project.projectId}_firestore_export.json`);
       return { collectionsCount: res.collectionsCount };
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(
-          project,
-          firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-        ),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
       const res = await electron.exportCollections();
       if (!res.success) throw new Error(res.error || 'Export failed');
       return res;
@@ -772,14 +727,7 @@ export const deleteCollection = createAppAsyncThunk<
       });
       documents = res.success ? ((res.documents || []) as Document[]) : [];
     } else {
-      await electron.disconnectFirebase();
-      await electron.connectFirebase({
-        serviceAccountPath: project.serviceAccountPath!,
-        databaseId: getServiceAccountConnectDatabaseId(
-          project,
-          firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id,
-        ),
-      });
+      await connectForProject(electron, project, firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id);
       const res = await electron.getDocuments({
         collectionPath: collection,
         limit: 10000,

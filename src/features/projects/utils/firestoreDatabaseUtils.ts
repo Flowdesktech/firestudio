@@ -4,7 +4,7 @@ import type { FirestoreDatabase } from './firestoreDatabaseTypes';
 export type ServiceAccountProjectLike = {
   id: string;
   projectId: string;
-  authMethod: 'serviceAccount' | 'google';
+  authMethod: 'serviceAccount' | 'google' | 'emulator';
   databaseId?: string;
   collections?: { id: string; path: string }[];
   firestoreDatabases?: FirestoreDatabase[];

@@ -2,6 +2,7 @@
 import { Menu, MenuItem, ListItemIcon, Divider, Box, Typography } from '@mui/material';
 import { Project, GoogleAccount } from '../../store/projectsSlice';
 import { MenuTarget } from '../../types';
+import { getConsoleLabel } from '../../utils/projectConsoleUrl';
 
 interface SidebarMenuProps {
   menuAnchor: HTMLElement | null;
@@ -150,7 +151,7 @@ function SidebarMenu({
             <ListItemIcon>
               <OpenInNewIcon fontSize="small" />
             </ListItemIcon>
-            Reveal in Firebase Console
+            {getConsoleLabel(menuTarget)}
           </MenuItem>
           <MenuItem onClick={() => handleAction(onCopyProjectId, menuTarget)}>
             <ListItemIcon>
@@ -294,7 +295,7 @@ function SidebarMenu({
             <ListItemIcon>
               <OpenInNewIcon fontSize="small" />
             </ListItemIcon>
-            Reveal in Firebase Console
+            {getConsoleLabel(menuTarget.project)}
           </MenuItem>
         </>
       ) : menuTarget ? (
@@ -323,7 +324,7 @@ function SidebarMenu({
             <ListItemIcon>
               <OpenInNewIcon fontSize="small" />
             </ListItemIcon>
-            Reveal in Firebase Console
+            {getConsoleLabel(menuTarget)}
           </MenuItem>
           <MenuItem onClick={() => handleAction(onCopyProjectId, menuTarget)}>
             <ListItemIcon>
