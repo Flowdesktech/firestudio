@@ -191,6 +191,7 @@ function ProjectSidebar({
   const serviceAccountProjects = projects.filter(
     (p) => !isGoogleAccount(p) && p.authMethod === 'serviceAccount',
   ) as Project[];
+  const emulatorProjects = projects.filter((p) => !isGoogleAccount(p) && p.authMethod === 'emulator') as Project[];
 
   return (
     <Box
@@ -251,6 +252,7 @@ function ProjectSidebar({
       <SidebarProjectsList
         googleAccounts={googleAccounts}
         serviceAccountProjects={serviceAccountProjects}
+        emulatorProjects={emulatorProjects}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         expandedItems={expandedItems}

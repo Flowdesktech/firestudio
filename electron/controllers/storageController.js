@@ -10,12 +10,65 @@ const fetch = require('node-fetch');
 const googleController = require('./googleController');
 
 let adminRef = null;
+let storageEmulatorHost = null;
 
 // Cache for resolved bucket names per project
 const bucketNameCache = {};
 
 function setAdminRef(admin) {
   adminRef = admin;
+}
+
+function setStorageEmulatorHost(host) {
+  storageEmulatorHost = host;
+}
+
+function getEmulatorBaseUrl() {
+  if (!storageEmulatorHost) return null;
+  return `http://${storageEmulatorHost}/v0`;
+}
+
+/**
+ * Detect the correct bucket name for a project on the storage emulator.
+ * Tries both naming conventions and caches the result.
+ */
+async function getEmulatorBucketName(projectId) {
+  if (!storageEmulatorHost) return null;
+  if (bucketNameCache[projectId]) return bucketNameCache[projectId];
+
+  const baseUrl = getEmulatorBaseUrl();
+  const patterns = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
+
+  for (const bucketName of patterns) {
+    try {
+      const url = `${baseUrl}/b/${bucketName}/o?maxResults=1`;
+      const response = await fetch(url, { headers: { Authorization: 'Bearer owner' } });
+      if (response.ok) {
+        bucketNameCache[projectId] = bucketName;
+        return bucketName;
+      }
+    } catch (e) {
+      void e;
+    }
+  }
+
+  // Default to newer convention if no bucket exists yet
+  bucketNameCache[projectId] = patterns[0];
+  return patterns[0];
+}
+
+/**
+ * Normalize a Firebase Storage REST API response item to the frontend's StorageFile shape.
+ */
+function normalizeStorageItem(item, prefix) {
+  return {
+    name: item.name ? item.name.replace(prefix || '', '').replace(/\/$/, '') : '',
+    path: item.name || '',
+    type: item.name && item.name.endsWith('/') ? 'folder' : 'file',
+    size: parseInt(item.size || 0, 10),
+    contentType: item.contentType || 'application/octet-stream',
+    updated: item.updated || item.timeCreated || null,
+  };
 }
 
 /**
@@ -66,14 +119,38 @@ function getProjectId() {
 }
 
 function registerHandlers() {
-  // List files (Admin SDK)
+  // List files (Admin SDK / Emulator REST)
   ipcMain.handle('storage:listFiles', async (event, { path: storagePath = '' }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
       const projectId = getProjectId();
-      const bucket = adminRef.storage().bucket(`${projectId}.appspot.com`);
+      if (!projectId) throw new Error('Not connected to Firebase');
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
       const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
 
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const url = `${baseUrl}/b/${bucketName}/o?prefix=${encodeURIComponent(prefix)}&delimiter=/`;
+        const response = await fetch(url, {
+          headers: { Authorization: 'Bearer owner' },
+        });
+        const data = await response.json();
+        if (data.error) {
+          return { success: false, error: data.error.message || 'Storage list failed' };
+        }
+        const folders = (data.prefixes || []).map((p) => ({
+          name: p.replace(prefix, '').replace(/\/$/, ''),
+          path: p,
+          type: 'folder',
+          size: 0,
+          updated: null,
+        }));
+        const fileList = (data.items || [])
+          .filter((f) => f.name !== prefix && !f.name.endsWith('/'))
+          .map((f) => normalizeStorageItem(f, prefix));
+        return { success: true, items: [...folders, ...fileList], currentPath: storagePath };
+      }
+
+      const bucket = adminRef.storage().bucket(bucketName);
       const [files] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
       const [, , apiResponse] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
 
@@ -101,18 +178,37 @@ function registerHandlers() {
     }
   });
 
-  // Upload file (Admin SDK)
+  // Upload file (Admin SDK / Emulator REST)
   ipcMain.handle('storage:uploadFile', async (event, { storagePath }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
       const { filePaths } = await dialog.showOpenDialog({ properties: ['openFile'] });
       if (!filePaths?.length) return { success: false, error: 'No file selected' };
 
       const localPath = filePaths[0];
       const fileName = path.basename(localPath);
-      const bucket = adminRef.storage().bucket(`${getProjectId()}.appspot.com`);
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
       const destination = storagePath ? `${storagePath}/${fileName}` : fileName;
 
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const fileContent = fs.readFileSync(localPath);
+        const mimeType = require('mime-types').lookup(localPath) || 'application/octet-stream';
+        const url = `${baseUrl}/b/${bucketName}/o?uploadType=media&name=${encodeURIComponent(destination)}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer owner', 'Content-Type': mimeType },
+          body: fileContent,
+        });
+        const data = await response.json();
+        if (data.error) {
+          return { success: false, error: data.error.message || 'Upload failed' };
+        }
+        return { success: true, fileName, path: destination };
+      }
+
+      const bucket = adminRef.storage().bucket(bucketName);
       await bucket.upload(localPath, {
         destination,
         metadata: { contentType: require('mime-types').lookup(localPath) || 'application/octet-stream' },
@@ -123,14 +219,29 @@ function registerHandlers() {
     }
   });
 
-  // Download file (Admin SDK)
+  // Download file (Admin SDK / Emulator REST)
   ipcMain.handle('storage:downloadFile', async (event, { filePath }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
       const { filePath: savePath } = await dialog.showSaveDialog({ defaultPath: filePath.split('/').pop() });
       if (!savePath) return { success: false, error: 'No save location' };
 
-      const bucket = adminRef.storage().bucket(`${getProjectId()}.appspot.com`);
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+        const url = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media`;
+        const response = await fetch(url, { headers: { Authorization: 'Bearer owner' } });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          return { success: false, error: err.error?.message || 'Download failed' };
+        }
+        const buffer = await response.buffer();
+        fs.writeFileSync(savePath, buffer);
+        return { success: true, savedTo: savePath };
+      }
+
+      const bucket = adminRef.storage().bucket(`${projectId}.appspot.com`);
       await bucket.file(filePath).download({ destination: savePath });
       return { success: true, savedTo: savePath };
     } catch (error) {
@@ -138,11 +249,28 @@ function registerHandlers() {
     }
   });
 
-  // Get signed URL (Admin SDK)
+  // Get download URL (Admin SDK / Emulator REST)
   ipcMain.handle('storage:getDownloadUrl', async (event, { filePath, expiresInMs }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
-      const bucket = adminRef.storage().bucket(`${getProjectId()}.appspot.com`);
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        // Fetch metadata to check for download tokens
+        const metaUrl = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}`;
+        const metaResponse = await fetch(metaUrl, { headers: { Authorization: 'Bearer owner' } });
+        const metadata = await metaResponse.json();
+        if (metadata.error) {
+          return { success: false, error: metadata.error.message || 'File not found' };
+        }
+        const token = metadata.downloadTokens ? metadata.downloadTokens.split(',')[0] : 'owner';
+        const url = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
+        return { success: true, url };
+      }
+
+      const bucket = adminRef.storage().bucket(bucketName);
       const expiration = expiresInMs || 7 * 24 * 60 * 60 * 1000;
       const expiresDate = new Date(Date.now() + expiration);
       const expiresString = `${String(expiresDate.getMonth() + 1).padStart(2, '0')}-${String(expiresDate.getDate()).padStart(2, '0')}-${expiresDate.getFullYear()}`;
@@ -153,25 +281,60 @@ function registerHandlers() {
     }
   });
 
-  // Delete file (Admin SDK)
+  // Delete file (Admin SDK / Emulator REST)
   ipcMain.handle('storage:deleteFile', async (event, { filePath }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
-      await adminRef.storage().bucket(`${getProjectId()}.appspot.com`).file(filePath).delete();
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const url = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}`;
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer owner' },
+        });
+        if (!response.ok && response.status !== 204) {
+          const err = await response.json().catch(() => ({}));
+          return { success: false, error: err.error?.message || 'Delete failed' };
+        }
+        return { success: true };
+      }
+
+      await adminRef.storage().bucket(bucketName).file(filePath).delete();
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }
   });
 
-  // Create folder (Admin SDK)
+  // Create folder (Admin SDK / Emulator REST)
   ipcMain.handle('storage:createFolder', async (event, { folderPath }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
       const placeholderPath = folderPath.endsWith('/') ? folderPath + '.placeholder' : folderPath + '/.placeholder';
+
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const url = `${baseUrl}/b/${bucketName}/o?uploadType=media&name=${encodeURIComponent(placeholderPath)}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/x-empty' },
+          body: '',
+        });
+        const data = await response.json();
+        if (data.error) {
+          return { success: false, error: data.error.message || 'Folder creation failed' };
+        }
+        return { success: true, folderPath };
+      }
+
       await adminRef
         .storage()
-        .bucket(`${getProjectId()}.appspot.com`)
+        .bucket(bucketName)
         .file(placeholderPath)
         .save('', { metadata: { contentType: 'application/x-empty' } });
       return { success: true, folderPath };
@@ -180,11 +343,36 @@ function registerHandlers() {
     }
   });
 
-  // Get file metadata (Admin SDK)
+  // Get file metadata (Admin SDK / Emulator REST)
   ipcMain.handle('storage:getFileMetadata', async (event, { filePath }) => {
     try {
-      if (!adminRef?.apps?.length) throw new Error('Not connected');
-      const [metadata] = await adminRef.storage().bucket(`${getProjectId()}.appspot.com`).file(filePath).getMetadata();
+      const projectId = getProjectId();
+      if (!projectId) throw new Error('Not connected');
+      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+
+      if (storageEmulatorHost) {
+        const baseUrl = getEmulatorBaseUrl();
+        const url = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}`;
+        const response = await fetch(url, { headers: { Authorization: 'Bearer owner' } });
+        const data = await response.json();
+        if (data.error) {
+          return { success: false, error: data.error.message || 'File not found' };
+        }
+        return {
+          success: true,
+          metadata: {
+            name: data.name,
+            size: parseInt(data.size || 0, 10),
+            contentType: data.contentType || 'application/octet-stream',
+            created: data.timeCreated || null,
+            updated: data.updated || null,
+            generation: data.generation || null,
+            md5Hash: data.md5Hash || null,
+          },
+        };
+      }
+
+      const [metadata] = await adminRef.storage().bucket(bucketName).file(filePath).getMetadata();
       return {
         success: true,
         metadata: {
@@ -372,4 +560,4 @@ function registerHandlers() {
   });
 }
 
-module.exports = { registerHandlers, setAdminRef };
+module.exports = { registerHandlers, setAdminRef, setStorageEmulatorHost };

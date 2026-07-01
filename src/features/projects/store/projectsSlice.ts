@@ -21,8 +21,11 @@ export interface FirestoreCollection {
 export interface Project {
   id: string;
   projectId: string;
-  authMethod: 'serviceAccount' | 'google';
+  authMethod: 'serviceAccount' | 'google' | 'emulator';
   serviceAccountPath?: string;
+  emulatorHost?: string;
+  emulatorPort?: number;
+  emulatorServices?: Record<string, { host: string; port: number }>;
   /** @deprecated Prefer firestoreDatabases; kept for persisted legacy */
   databaseId?: string;
   /** @deprecated Prefer firestoreDatabases[].collections */
@@ -273,6 +276,75 @@ export const addFirestoreDatabase = createAppAsyncThunk(
   },
 );
 
+export const scanEmulators = createAppAsyncThunk('projects/scanEmulators', async (_, { extra, rejectWithValue }) => {
+  const electron = extra.electron.api;
+  const hubRes = await electron.scanEmulatorsHub();
+  if (!hubRes?.success) return rejectWithValue(hubRes?.error || 'Failed to scan emulators hub');
+
+  return { emulators: hubRes.emulators || [] };
+});
+
+export const connectEmulatorProject = createAppAsyncThunk(
+  'projects/connectEmulatorProject',
+  async (
+    {
+      projectId,
+      host,
+      port,
+      services,
+    }: { projectId: string; host: string; port: number; services?: Record<string, { host: string; port: number }> },
+    { extra, getState },
+  ) => {
+    const electron = extra.electron.api;
+    const state = getState() as RootState;
+    const emulatorId = `emulator-${projectId}-${port}`;
+
+    const existing = state.projects.items.find((i): i is Project => !isGoogleAccount(i) && i.id === emulatorId);
+    if (existing) {
+      return { mode: 'existing' as const, projectId: existing.id };
+    }
+
+    const authEmulatorHost = services?.auth ? `${services.auth.host}:${services.auth.port}` : undefined;
+    const storageEmulatorHost = services?.storage ? `${services.storage.host}:${services.storage.port}` : undefined;
+
+    await electron.disconnectFirebase();
+    const result = await electron.connectFirebase({
+      projectId,
+      emulatorHost: `${host}:${port}`,
+      authEmulatorHost,
+      storageEmulatorHost,
+    });
+
+    if (!result?.success) throw new Error(result?.error || 'Emulator connection failed');
+
+    const collectionsResult = await electron.getCollections();
+    const collections = collectionsResult?.success ? normalizeCollections(collectionsResult.collections) : [];
+
+    const newFd: FirestoreDatabase = {
+      id: `fd-${Date.now()}`,
+      databaseId: '(default)',
+      label: 'Emulator (default)',
+      collections,
+    };
+
+    return {
+      mode: 'create' as const,
+      project: {
+        id: emulatorId,
+        projectId,
+        authMethod: 'emulator' as const,
+        emulatorHost: `${host}:${port}`,
+        emulatorPort: port,
+        emulatorServices: services,
+        firestoreDatabases: [newFd],
+        activeFirestoreDatabaseId: newFd.id,
+        expanded: true,
+        connected: true,
+      } satisfies Project,
+    };
+  },
+);
+
 export const addGoogleFirestoreDatabase = createAppAsyncThunk(
   'projects/addGoogleFirestoreDatabase',
   async (
@@ -359,10 +431,19 @@ export const refreshCollections = createAppAsyncThunk(
         if (!fd) {
           return rejectWithValue('No Firestore database configured for this project.');
         }
-        await electron.disconnectFirebase();
+        const authHost = project.emulatorServices?.auth
+          ? `${project.emulatorServices.auth.host}:${project.emulatorServices.auth.port}`
+          : undefined;
+        const storageHost = project.emulatorServices?.storage
+          ? `${project.emulatorServices.storage.host}:${project.emulatorServices.storage.port}`
+          : undefined;
         const connectResult = await electron.connectFirebase({
           serviceAccountPath: project.serviceAccountPath || '',
           databaseId: databaseIdToConnectParam(fd.databaseId),
+          emulatorHost: project.emulatorHost,
+          projectId: project.projectId,
+          authEmulatorHost: authHost,
+          storageEmulatorHost: storageHost,
         });
         if (!connectResult?.success) {
           throw new Error(connectResult?.error || 'Failed to connect to Firebase');
@@ -662,6 +743,23 @@ const projectsSlice = createSlice({
       .addCase(addFirestoreDatabase.rejected, (state) => {
         state.loading = false;
       })
+      .addCase(connectEmulatorProject.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(connectEmulatorProject.fulfilled, (state, action) => {
+        const payload = action.payload;
+        if (payload.mode === 'create') {
+          state.items.push(payload.project);
+          state.selectedProjectId = payload.project.id;
+        } else {
+          state.selectedProjectId = payload.projectId;
+        }
+        state.loading = false;
+      })
+      .addCase(connectEmulatorProject.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || null;
+      })
       .addCase(addGoogleFirestoreDatabase.pending, (state) => {
         state.loading = true;
       })
@@ -690,6 +788,7 @@ const projectsSlice = createSlice({
       .addCase(addGoogleFirestoreDatabase.rejected, (state) => {
         state.loading = false;
       })
+
       .addCase(refreshGoogleAccountProjects.fulfilled, (state, action) => {
         const { accountId, accessToken, projects } = action.payload;
         state.items = state.items.map((item) => {

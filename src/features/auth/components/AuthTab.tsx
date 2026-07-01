@@ -71,6 +71,7 @@ interface AuthUser {
 }
 
 import { Project } from '../../projects/store/projectsSlice';
+import { getConsoleUrl } from '../../projects/utils/projectConsoleUrl';
 
 interface AuthTabProps {
   project: Project;
@@ -120,6 +121,7 @@ function AuthTab({ project, addLog, showMessage }: AuthTabProps) {
   const [editEmailVerified, setEditEmailVerified] = useState(false);
 
   const isGoogle = project?.authMethod === 'google';
+  const isEmulator = project?.authMethod === 'emulator';
   const loadingRef = useRef<boolean>(false);
 
   const loadUsers = useCallback(async () => {
@@ -130,14 +132,32 @@ function AuthTab({ project, addLog, showMessage }: AuthTabProps) {
     setLoading(true);
     setAuthError(null);
     try {
-      const result = isGoogle
-        ? await electron.googleListAuthUsers({ projectId: project.projectId, maxResults: 1000 })
-        : (await electron.disconnectFirebase(),
-          await electron.connectFirebase({
-            serviceAccountPath: project.serviceAccountPath!,
-            databaseId: getServiceAccountConnectDatabaseId(project),
-          }),
-          await electron.listAuthUsers({ limit: 1000 }));
+      let result;
+      if (isGoogle) {
+        result = await electron.googleListAuthUsers({ projectId: project.projectId, maxResults: 1000 });
+      } else if (isEmulator) {
+        const authHost = project.emulatorServices?.auth
+          ? `${project.emulatorServices.auth.host}:${project.emulatorServices.auth.port}`
+          : undefined;
+        const storageHost = project.emulatorServices?.storage
+          ? `${project.emulatorServices.storage.host}:${project.emulatorServices.storage.port}`
+          : undefined;
+        await electron.disconnectFirebase();
+        await electron.connectFirebase({
+          projectId: project.projectId,
+          emulatorHost: project.emulatorHost,
+          authEmulatorHost: authHost,
+          storageEmulatorHost: storageHost,
+        });
+        result = await electron.listAuthUsers({ limit: 1000 });
+      } else {
+        await electron.disconnectFirebase();
+        await electron.connectFirebase({
+          serviceAccountPath: project.serviceAccountPath!,
+          databaseId: getServiceAccountConnectDatabaseId(project),
+        });
+        result = await electron.listAuthUsers({ limit: 1000 });
+      }
 
       if (result.success) {
         setUsers(result.users || []);
@@ -163,14 +183,14 @@ function AuthTab({ project, addLog, showMessage }: AuthTabProps) {
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [project, isGoogle, addLog, showMessage, electron]);
+  }, [project, isGoogle, isEmulator, addLog, showMessage, electron]);
 
   useEffect(() => {
     if (project) loadUsers();
   }, [project, loadUsers]);
 
   const openFirebaseConsole = () => {
-    const url = `https://console.firebase.google.com/project/${project.projectId}/authentication/users`;
+    const url = getConsoleUrl(project, 'authentication');
     electronService.openExternal(url);
   };
 

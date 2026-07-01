@@ -26,6 +26,7 @@ import projectsReducer, {
   updateProject,
   addGoogleAccount,
   connectServiceAccount,
+  connectEmulatorProject,
   refreshCollections,
   Project,
   GoogleAccount,
@@ -54,6 +55,7 @@ projectsPersistenceListener.startListening({
     updateProject,
     addGoogleAccount,
     connectServiceAccount.fulfilled,
+    connectEmulatorProject.fulfilled,
     refreshCollections.fulfilled,
   ),
   effect: (_, api) => {

@@ -546,7 +546,7 @@ Examples:
           {allProjects.map((p) => (
             <Chip
               key={p.id}
-              label={p.projectId}
+              label={p.authMethod === 'emulator' ? `${p.projectId} (local emulator)` : p.projectId}
               size="small"
               onClick={() => setSelectedProject(p)}
               color={selectedProject?.id === p.id ? 'primary' : 'default'}

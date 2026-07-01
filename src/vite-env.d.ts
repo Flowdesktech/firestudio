@@ -159,8 +159,12 @@ interface GoogleSignInResult {
 }
 
 interface ConnectFirebaseParams {
-  serviceAccountPath: string;
+  serviceAccountPath?: string;
   databaseId?: string;
+  emulatorHost?: string;
+  projectId?: string;
+  authEmulatorHost?: string;
+  storageEmulatorHost?: string;
 }
 
 interface ConnectFirebaseResult {
@@ -177,10 +181,38 @@ interface GoogleSetRefreshTokenResult {
   error?: string;
 }
 
+interface EmulatorServiceInfo {
+  host: string;
+  port: number;
+}
+
+interface EmulatorHubCandidate {
+  projectId: string;
+  host: string;
+  port: number;
+  services: Record<string, EmulatorServiceInfo>;
+}
+
+interface EmulatorHubResult {
+  success: boolean;
+  emulators?: EmulatorHubCandidate[];
+  error?: string;
+}
+
+interface EmulatorConfigResult {
+  success: boolean;
+  activeProjects?: Record<string, string>;
+  error?: string;
+}
+
 interface ElectronAPI {
   // Firebase
   connectFirebase: (params: ConnectFirebaseParams) => Promise<ConnectFirebaseResult>;
   disconnectFirebase: () => Promise<{ success: boolean }>;
+
+  // Emulators
+  scanEmulatorsHub: () => Promise<EmulatorHubResult>;
+  scanEmulatorsConfig: () => Promise<EmulatorConfigResult>;
 
   // Firestore
   getCollections: () => Promise<{ success: boolean; collections?: FirestoreCollection[]; error?: string }>;

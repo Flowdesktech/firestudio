@@ -9,12 +9,18 @@ const fs = require('fs');
 let admin = null;
 let db = null;
 let onConnectionChange = null;
+let currentAuthEmulatorHost = null;
+let currentStorageEmulatorHost = null;
 
 function getAdmin() {
   return admin;
 }
 function getDb() {
   return db;
+}
+
+function getStorageEmulatorHost() {
+  return currentStorageEmulatorHost;
 }
 
 /**
@@ -34,6 +40,25 @@ function registerHandlers() {
       // Support both object params and legacy string path
       const serviceAccountPath = typeof params === 'string' ? params : params.serviceAccountPath;
       const databaseId = typeof params === 'string' ? undefined : params.databaseId;
+      const emulatorHost = typeof params === 'string' ? undefined : params.emulatorHost;
+      const explicitProjectId = typeof params === 'string' ? undefined : params.projectId;
+      const authEmulatorHost = typeof params === 'string' ? undefined : params.authEmulatorHost;
+      const storageEmulatorHost = typeof params === 'string' ? undefined : params.storageEmulatorHost;
+
+      if (emulatorHost) {
+        process.env.FIRESTORE_EMULATOR_HOST = emulatorHost;
+      } else {
+        delete process.env.FIRESTORE_EMULATOR_HOST;
+      }
+
+      if (authEmulatorHost) {
+        process.env.FIREBASE_AUTH_EMULATOR_HOST = authEmulatorHost;
+      } else {
+        delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
+      }
+
+      currentAuthEmulatorHost = authEmulatorHost || null;
+      currentStorageEmulatorHost = storageEmulatorHost || null;
 
       const adminSdk = require('firebase-admin');
 
@@ -49,11 +74,21 @@ function registerHandlers() {
         }
       }
 
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      let projectId = explicitProjectId;
 
-      adminSdk.initializeApp({
-        credential: adminSdk.credential.cert(serviceAccount),
-      });
+      if (serviceAccountPath) {
+        const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        projectId = serviceAccount.project_id;
+        adminSdk.initializeApp({
+          credential: adminSdk.credential.cert(serviceAccount),
+          projectId,
+        });
+      } else if (emulatorHost && explicitProjectId) {
+        // Emulator connection without service account
+        adminSdk.initializeApp({ projectId: explicitProjectId });
+      } else {
+        throw new Error('Must provide either serviceAccountPath or emulatorHost with projectId');
+      }
 
       admin = adminSdk;
       db = adminSdk.firestore();
@@ -64,13 +99,15 @@ function registerHandlers() {
 
       // Notify other controllers about the connection change
       if (onConnectionChange) {
-        onConnectionChange(admin, db);
+        onConnectionChange(admin, db, currentAuthEmulatorHost, currentStorageEmulatorHost);
       }
 
-      return { success: true, projectId: serviceAccount.project_id, databaseId };
+      return { success: true, projectId, databaseId };
     } catch (error) {
       admin = null;
       db = null;
+      currentAuthEmulatorHost = null;
+      currentStorageEmulatorHost = null;
       try {
         const adminSdk = require('firebase-admin');
         const leftover = [...adminSdk.apps];
@@ -85,7 +122,7 @@ function registerHandlers() {
         void e2;
       }
       if (onConnectionChange) {
-        onConnectionChange(null, null);
+        onConnectionChange(null, null, null, null);
       }
       return { success: false, error: error.message };
     }
@@ -105,9 +142,11 @@ function registerHandlers() {
       }
       admin = null;
       db = null;
+      currentAuthEmulatorHost = null;
+      currentStorageEmulatorHost = null;
 
       if (onConnectionChange) {
-        onConnectionChange(null, null);
+        onConnectionChange(null, null, null, null);
       }
       return { success: true };
     } catch (error) {
@@ -129,5 +168,6 @@ module.exports = {
   registerHandlers,
   getAdmin,
   getDb,
+  getStorageEmulatorHost,
   setConnectionChangeCallback,
 };

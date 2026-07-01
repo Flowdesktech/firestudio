@@ -20,8 +20,15 @@ import {
   Close as CloseIcon,
   Key as KeyIcon,
   Google as GoogleIcon,
+  Dns as DnsIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { electronService } from '../../../shared/services/electronService';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '../../../app/store';
+import { scanEmulators, connectEmulatorProject } from '../store/projectsSlice';
+import { addLog } from '../../../app/store/slices/logsSlice';
+import { getErrorMessage } from '../../../shared/utils/commonUtils';
 
 interface ConnectionDialogProps {
   open: boolean;
@@ -34,9 +41,51 @@ interface ConnectionDialogProps {
 
 function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }: ConnectionDialogProps) {
   const theme = useTheme();
-  // isDark removed, use theme.palette directly
+  const dispatch = useDispatch<AppDispatch>();
+
   const [tabIndex, setTabIndex] = useState(0);
   const [serviceAccountPath, setServiceAccountPath] = useState('');
+
+  const [emulators, setEmulators] = useState<
+    Array<{ projectId: string; host: string; port: number; services?: Record<string, { host: string; port: number }> }>
+  >([]);
+  const [emulatorsLoading, setEmulatorsLoading] = useState(false);
+  const [connectingEmulatorId, setConnectingEmulatorId] = useState<string | null>(null);
+
+  const fetchEmulators = async () => {
+    setEmulatorsLoading(true);
+    try {
+      const result = await dispatch(scanEmulators()).unwrap();
+      setEmulators(result.emulators || []);
+    } catch (err) {
+      dispatch(addLog({ type: 'error', message: 'Failed to scan for emulators: ' + getErrorMessage(err) }));
+    } finally {
+      setEmulatorsLoading(false);
+    }
+  };
+
+  const handleConnectEmulator = async (emulator: {
+    projectId: string;
+    host: string;
+    port: number;
+    services?: Record<string, { host: string; port: number }>;
+  }) => {
+    const id = `${emulator.projectId}-${emulator.port}`;
+    setConnectingEmulatorId(id);
+    try {
+      const result = await dispatch(connectEmulatorProject(emulator)).unwrap();
+      if (result.mode === 'create') {
+        dispatch(addLog({ type: 'success', message: `Connected to emulator for project ${emulator.projectId}` }));
+      } else {
+        dispatch(addLog({ type: 'success', message: `Emulator ${emulator.projectId} already connected` }));
+      }
+      onClose();
+    } catch (err) {
+      dispatch(addLog({ type: 'error', message: 'Failed to connect emulator: ' + getErrorMessage(err) }));
+    } finally {
+      setConnectingEmulatorId(null);
+    }
+  };
 
   const handleBrowse = async () => {
     const path = await electronService.api.openFileDialog();
@@ -58,9 +107,10 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
   };
 
   const handleClose = () => {
-    if (!loading) {
+    if (!loading && !connectingEmulatorId) {
       setServiceAccountPath('');
       setTabIndex(0);
+      setEmulators([]);
       onClose();
     }
   };
@@ -78,6 +128,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
         <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)}>
           <Tab icon={<GoogleIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Google Sign-In" />
           <Tab icon={<KeyIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Service Account" />
+          <Tab icon={<DnsIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Local Emulator" />
         </Tabs>
       </Box>
 
@@ -141,7 +192,7 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
               </Typography>
             </Box>
           </Box>
-        ) : (
+        ) : tabIndex === 1 ? (
           /* Service Account Tab */
           <Box sx={{ py: 2 }}>
             <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
@@ -197,6 +248,79 @@ function ConnectionDialog({ open, onClose, onConnect, onGoogleSignIn, loading }:
                 </ol>
               </Typography>
             </Box>
+          </Box>
+        ) : (
+          /* Local Emulator Tab */
+          <Box sx={{ py: 2 }}>
+            <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+              Connect to a locally running Firebase Emulator Suite instance.
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mb: 4 }}>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={emulatorsLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                onClick={fetchEmulators}
+                disabled={emulatorsLoading}
+                sx={{ px: 4, py: 1.5 }}
+              >
+                {emulatorsLoading ? 'Scanning...' : 'Scan for emulators'}
+              </Button>
+            </Box>
+
+            {emulators.length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>
+                  Discovered Emulators
+                </Typography>
+                {emulators.map((emulator) => {
+                  const id = `${emulator.projectId}-${emulator.port}`;
+                  const isConnecting = connectingEmulatorId === id;
+                  return (
+                    <Box
+                      key={id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        p: 2,
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <DnsIcon color="primary" />
+                        <Box>
+                          <Typography variant="body2" fontWeight="500">
+                            {emulator.projectId}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Host: {emulator.host}:{emulator.port}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleConnectEmulator(emulator)}
+                        disabled={isConnecting || loading}
+                      >
+                        {isConnecting ? 'Connecting...' : 'Connect'}
+                      </Button>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+
+            {emulatorsLoading === false && emulators.length === 0 && (
+              <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
+                No running Firebase emulators detected.
+              </Typography>
+            )}
           </Box>
         )}
       </DialogContent>
