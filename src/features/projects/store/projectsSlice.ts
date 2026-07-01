@@ -526,7 +526,8 @@ export const refreshGoogleAccountProjects = createAppAsyncThunk(
     try {
       const state = getState();
       const existingAccount = state.projects.items.find((item) => isGoogleAccount(item) && item.id === accountId) as
-        GoogleAccount | undefined;
+        | GoogleAccount
+        | undefined;
       const effectiveRefreshToken = refreshToken ?? existingAccount?.refreshToken;
 
       let accessToken = existingAccount?.accessToken;

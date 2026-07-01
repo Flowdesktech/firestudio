@@ -54,7 +54,9 @@ interface SidebarProjectsListProps {
   handleContextMenu: (
     e: React.MouseEvent,
     target:
-      Project | { project: Project | GoogleAccount; collection: string; firestoreDatabaseId?: string } | MenuTarget,
+      | Project
+      | { project: Project | GoogleAccount; collection: string; firestoreDatabaseId?: string }
+      | MenuTarget,
     type: Exclude<MenuTargetType, 'account'>,
   ) => void;
   isMenuOpen: boolean;
