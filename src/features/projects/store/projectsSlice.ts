@@ -697,7 +697,9 @@ const projectsSlice = createSlice({
             if (item.id === projectId) {
               const proj = item as Project;
               if (
-                (proj.authMethod === 'serviceAccount' || proj.authMethod === 'google') &&
+                (proj.authMethod === 'serviceAccount' ||
+                  proj.authMethod === 'google' ||
+                  proj.authMethod === 'emulator') &&
                 firestoreDatabaseId &&
                 proj.firestoreDatabases?.length
               ) {
