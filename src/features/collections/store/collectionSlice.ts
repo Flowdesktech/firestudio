@@ -323,13 +323,13 @@ export const createCollection = createAppAsyncThunk<
       }
 
       const fdId = firestoreDatabaseId ?? getActiveFirestoreDatabase(project)?.id;
-      dispatch(
+      await dispatch(
         refreshCollections({
           project,
           refreshToken: project.refreshToken,
           ...(fdId ? { firestoreDatabaseId: fdId } : {}),
         }),
-      );
+      ).unwrap();
       return trimmedName;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
