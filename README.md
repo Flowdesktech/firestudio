@@ -24,6 +24,7 @@ Firestudio is a **free and open-source desktop application** for managing your c
 - 👥 **Authentication**: View, create, and manage Firebase Auth users
 - 🔍 **Querying**: Use simple filters or JavaScript for advanced queries
 - 📥 **Import/Export**: Bulk operations with JSON files
+- 🔧 **Local Emulator Support**: Connect to Firebase Local Emulator Suite
 - 🎨 **Themes**: Dark/Light mode with customizable settings
 
 Perfect for **Firebase developers**, **backend engineers**, **database administrators**, and anyone working with **Google Firebase**.
@@ -52,6 +53,7 @@ Perfect for **Firebase developers**, **backend engineers**, **database administr
 
 - **Service Account**: Connect using Firebase service account JSON files for full admin access
 - **Google Sign-In**: OAuth-based authentication using your Google account
+- **Local Emulator**: Connect directly to Firebase Local Emulator Suite for local development
 
 ### 📊 Firestore Database Management
 
@@ -181,6 +183,12 @@ pnpm run dev
 #### Method 2: Google Sign-In
 
 See detailed OAuth setup guide in the [Google Sign-In Setup](#google-sign-in-setup) section.
+
+#### Method 3: Local Emulator
+
+1. Start your Firebase Emulators (`firebase emulators:start`)
+2. In Firestudio, click **"Add Project"** → **"Local Emulator"** tab
+3. Select a detected emulator from the list and click **"Connect"**
 
 ---
 
