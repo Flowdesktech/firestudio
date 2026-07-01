@@ -166,12 +166,14 @@ function SidebarMenu({
             <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>Firestore</Typography>
           </Box>
           <Divider />
-          <MenuItem onClick={() => handleAction(onAddFirestoreDatabase, menuTarget.project)}>
-            <ListItemIcon>
-              <AddIcon fontSize="small" />
-            </ListItemIcon>
-            Add database
-          </MenuItem>
+          {menuTarget.project.authMethod !== 'emulator' && (
+            <MenuItem onClick={() => handleAction(onAddFirestoreDatabase, menuTarget.project)}>
+              <ListItemIcon>
+                <AddIcon fontSize="small" />
+              </ListItemIcon>
+              Add database
+            </MenuItem>
+          )}
         </>
       ) : menuTarget?.menuType === 'firestoreDatabase' ? (
         <>

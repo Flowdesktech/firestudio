@@ -430,18 +430,20 @@ function SidebarProjectsList({
                                       >
                                         Firestore
                                       </Typography>
-                                      <Tooltip title="Add database">
-                                        <IconButton
-                                          size="small"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onAddFirestoreDatabase(project);
-                                          }}
-                                          sx={{ p: 0.25, color: 'primary.main' }}
-                                        >
-                                          <AddIcon sx={{ fontSize: 16 }} />
-                                        </IconButton>
-                                      </Tooltip>
+                                      {project.authMethod !== 'emulator' && (
+                                        <Tooltip title="Add database">
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onAddFirestoreDatabase(project);
+                                            }}
+                                            sx={{ p: 0.25, color: 'primary.main' }}
+                                          >
+                                            <AddIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </Tooltip>
+                                      )}
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
@@ -927,18 +929,20 @@ function SidebarProjectsList({
                               >
                                 Firestore
                               </Typography>
-                              <Tooltip title="Add database">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddFirestoreDatabase(project);
-                                  }}
-                                  sx={{ p: 0.25, color: 'primary.main' }}
-                                >
-                                  <AddIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Tooltip>
+                              {project.authMethod !== 'emulator' && (
+                                <Tooltip title="Add database">
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAddFirestoreDatabase(project);
+                                    }}
+                                    sx={{ p: 0.25, color: 'primary.main' }}
+                                  >
+                                    <AddIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -1171,24 +1175,26 @@ function SidebarProjectsList({
                                   );
                                 })}
 
-                                <Box
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddFirestoreDatabase(project);
-                                  }}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    px: 1,
-                                    py: 0.5,
-                                    cursor: 'pointer',
-                                    color: 'primary.main',
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                  }}
-                                >
-                                  <AddIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                  <Typography sx={{ fontSize: '0.75rem' }}>Add database</Typography>
-                                </Box>
+                                {project.authMethod !== 'emulator' && (
+                                  <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAddFirestoreDatabase(project);
+                                    }}
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      px: 1,
+                                      py: 0.5,
+                                      cursor: 'pointer',
+                                      color: 'primary.main',
+                                      '&:hover': { bgcolor: 'action.hover' },
+                                    }}
+                                  >
+                                    <AddIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                                    <Typography sx={{ fontSize: '0.75rem' }}>Add database</Typography>
+                                  </Box>
+                                )}
                               </Box>
                             </Collapse>
                           </Box>
@@ -1392,18 +1398,20 @@ function SidebarProjectsList({
                               >
                                 Firestore
                               </Typography>
-                              <Tooltip title="Add database">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddFirestoreDatabase(project);
-                                  }}
-                                  sx={{ p: 0.25, color: 'primary.main' }}
-                                >
-                                  <AddIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Tooltip>
+                              {project.authMethod !== 'emulator' && (
+                                <Tooltip title="Add database">
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAddFirestoreDatabase(project);
+                                    }}
+                                    sx={{ p: 0.25, color: 'primary.main' }}
+                                  >
+                                    <AddIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -1636,24 +1644,26 @@ function SidebarProjectsList({
                                   );
                                 })}
 
-                                <Box
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddFirestoreDatabase(project);
-                                  }}
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    px: 1,
-                                    py: 0.5,
-                                    cursor: 'pointer',
-                                    color: 'primary.main',
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                  }}
-                                >
-                                  <AddIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                  <Typography sx={{ fontSize: '0.75rem' }}>Add database</Typography>
-                                </Box>
+                                {project.authMethod !== 'emulator' && (
+                                  <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onAddFirestoreDatabase(project);
+                                    }}
+                                    sx={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      px: 1,
+                                      py: 0.5,
+                                      cursor: 'pointer',
+                                      color: 'primary.main',
+                                      '&:hover': { bgcolor: 'action.hover' },
+                                    }}
+                                  >
+                                    <AddIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                                    <Typography sx={{ fontSize: '0.75rem' }}>Add database</Typography>
+                                  </Box>
+                                )}
                               </Box>
                             </Collapse>
                           </Box>
