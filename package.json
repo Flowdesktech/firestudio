@@ -152,15 +152,13 @@
           "target": "nsis",
           "arch": [
             "x64"
-          ],
-          "artifactName": "${productName}-${version}-Windows-Setup-${arch}.${ext}"
+          ]
         },
         {
           "target": "portable",
           "arch": [
             "x64"
-          ],
-          "artifactName": "${productName}-${version}-Windows-${arch}-portable.${ext}"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -170,7 +168,11 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico"
+      "uninstallerIcon": "assets/icon.ico",
+      "artifactName": "${productName}-${version}-Windows-Setup-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Windows-${arch}-portable.${ext}"
     },
     "mac": {
       "target": [
