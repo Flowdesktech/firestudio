@@ -138,6 +138,14 @@ Download the latest release for your platform from [GitHub Releases](https://git
 | macOS    | `.dmg` (Intel & Apple Silicon)    |
 | Linux    | `.AppImage`, `.deb`, or `.tar.gz` |
 
+#### Arch Linux (AUR)
+
+Arch Linux users can install Firestudio from the AUR:
+
+```bash
+yay -S firestudio-bin
+```
+
 #### macOS Users: First Launch
 
 Since the app is not signed with an Apple Developer certificate, macOS will show a security warning on first launch.
