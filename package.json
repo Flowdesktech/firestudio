@@ -232,10 +232,10 @@
       "esbuild",
       "sharp",
       "protobufjs"
-    ],
-    "overrides": {
-      "axios": ">=1.13.5",
-      "tar": ">=7.5.7"
-    }
+    ]
+  },
+  "overrides": {
+    "axios": ">=1.13.5",
+    "tar": ">=7.5.7"
   }
 }

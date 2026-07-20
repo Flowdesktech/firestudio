@@ -106,11 +106,12 @@ const TableRow: React.FC<TableRowProps> = ({
 
       {/* Document ID */}
       <div
-        title={doc.id}
+        title={doc.missing ? `${doc.id} — no fields; exists as a parent of subcollections` : doc.id}
         style={{
           padding: '6px 8px',
-          color: theme.palette.primary.main,
+          color: doc.missing ? theme.palette.text.disabled : theme.palette.primary.main,
           fontWeight: 500,
+          fontStyle: doc.missing ? 'italic' : 'normal',
           fontFamily: MONOSPACE_FONT_FAMILY,
           fontSize: '0.75rem',
           borderBottom: cellBorder,

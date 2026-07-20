@@ -8,14 +8,18 @@ const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
 const googleController = require('./googleController');
+const {
+  resolveAdminBucket,
+  resolveOauthBucket,
+  resolveEmulatorBucket,
+  clearBucketCache,
+} = require('./storage/bucketResolver');
 
 let adminRef = null;
 let storageEmulatorHost = null;
 
-// Cache for resolved bucket names per project
-const bucketNameCache = {};
-
 function setAdminRef(admin) {
+  if (!admin) clearBucketCache('admin:', 'emulator:');
   adminRef = admin;
 }
 
@@ -28,33 +32,9 @@ function getEmulatorBaseUrl() {
   return `http://${storageEmulatorHost}/v0`;
 }
 
-/**
- * Detect the correct bucket name for a project on the storage emulator.
- * Tries both naming conventions and caches the result.
- */
-async function getEmulatorBucketName(projectId) {
-  if (!storageEmulatorHost) return null;
-  if (bucketNameCache[projectId]) return bucketNameCache[projectId];
-
-  const baseUrl = getEmulatorBaseUrl();
-  const patterns = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
-
-  for (const bucketName of patterns) {
-    try {
-      const url = `${baseUrl}/b/${bucketName}/o?maxResults=1`;
-      const response = await fetch(url, { headers: { Authorization: 'Bearer owner' } });
-      if (response.ok) {
-        bucketNameCache[projectId] = bucketName;
-        return bucketName;
-      }
-    } catch (e) {
-      void e;
-    }
-  }
-
-  // Default to newer convention if no bucket exists yet
-  bucketNameCache[projectId] = patterns[0];
-  return patterns[0];
+function getBucketName(projectId) {
+  if (storageEmulatorHost) return resolveEmulatorBucket(getEmulatorBaseUrl(), projectId);
+  return resolveAdminBucket(adminRef, projectId);
 }
 
 /**
@@ -71,46 +51,6 @@ function normalizeStorageItem(item, prefix) {
   };
 }
 
-/**
- * Get the default storage bucket name for a Firebase project.
- * Firebase can use different bucket naming conventions:
- * - Older projects: {projectId}.appspot.com
- * - Newer projects: {projectId}.firebasestorage.app
- * - Custom domains: Could be anything
- */
-async function getStorageBucketName(projectId, accessToken) {
-  // Check cache first
-  if (bucketNameCache[projectId]) {
-    return bucketNameCache[projectId];
-  }
-
-  // Try different bucket name patterns
-  const bucketPatterns = [`${projectId}.appspot.com`, `${projectId}.firebasestorage.app`];
-
-  for (const bucketName of bucketPatterns) {
-    try {
-      const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}`;
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await response.json();
-
-      // If no error, bucket exists
-      if (!data.error) {
-        console.log(`[Storage] Found bucket: ${bucketName}`);
-        bucketNameCache[projectId] = bucketName;
-        return bucketName;
-      }
-    } catch (error) {
-      void error;
-      // Continue trying other patterns
-    }
-  }
-
-  // Default to appspot.com if nothing found (will show proper error to user)
-  return `${projectId}.appspot.com`;
-}
-
 function getProjectId() {
   if (adminRef?.apps?.length > 0) {
     return adminRef.app().options.credential?.projectId || adminRef.app().options.projectId;
@@ -124,7 +64,7 @@ function registerHandlers() {
     try {
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected to Firebase');
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
       const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
 
       if (storageEmulatorHost) {
@@ -188,7 +128,7 @@ function registerHandlers() {
 
       const localPath = filePaths[0];
       const fileName = path.basename(localPath);
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
       const destination = storagePath ? `${storagePath}/${fileName}` : fileName;
 
       if (storageEmulatorHost) {
@@ -226,10 +166,10 @@ function registerHandlers() {
       if (!projectId) throw new Error('Not connected');
       const { filePath: savePath } = await dialog.showSaveDialog({ defaultPath: filePath.split('/').pop() });
       if (!savePath) return { success: false, error: 'No save location' };
+      const bucketName = await getBucketName(projectId);
 
       if (storageEmulatorHost) {
         const baseUrl = getEmulatorBaseUrl();
-        const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
         const url = `${baseUrl}/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media`;
         const response = await fetch(url, { headers: { Authorization: 'Bearer owner' } });
         if (!response.ok) {
@@ -241,7 +181,7 @@ function registerHandlers() {
         return { success: true, savedTo: savePath };
       }
 
-      const bucket = adminRef.storage().bucket(`${projectId}.appspot.com`);
+      const bucket = adminRef.storage().bucket(bucketName);
       await bucket.file(filePath).download({ destination: savePath });
       return { success: true, savedTo: savePath };
     } catch (error) {
@@ -254,7 +194,7 @@ function registerHandlers() {
     try {
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected');
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
 
       if (storageEmulatorHost) {
         const baseUrl = getEmulatorBaseUrl();
@@ -286,7 +226,7 @@ function registerHandlers() {
     try {
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected');
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
 
       if (storageEmulatorHost) {
         const baseUrl = getEmulatorBaseUrl();
@@ -314,7 +254,7 @@ function registerHandlers() {
     try {
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected');
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
       const placeholderPath = folderPath.endsWith('/') ? folderPath + '.placeholder' : folderPath + '/.placeholder';
 
       if (storageEmulatorHost) {
@@ -348,7 +288,7 @@ function registerHandlers() {
     try {
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected');
-      const bucketName = storageEmulatorHost ? await getEmulatorBucketName(projectId) : `${projectId}.appspot.com`;
+      const bucketName = await getBucketName(projectId);
 
       if (storageEmulatorHost) {
         const baseUrl = getEmulatorBaseUrl();
@@ -396,7 +336,7 @@ function registerHandlers() {
     try {
       const accessToken = googleController.getAccessToken();
       if (!accessToken) return { success: false, error: 'Not signed in' };
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
       const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}/o?prefix=${encodeURIComponent(prefix)}&delimiter=/`;
       const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -445,7 +385,7 @@ function registerHandlers() {
       const fileName = path.basename(localPath);
       const fileContent = fs.readFileSync(localPath);
       const mimeType = require('mime-types').lookup(localPath) || 'application/octet-stream';
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const destination = storagePath ? `${storagePath}/${fileName}` : fileName;
       const url = `https://storage.googleapis.com/upload/storage/v1/b/${bucketName}/o?uploadType=media&name=${encodeURIComponent(destination)}`;
       const response = await fetch(url, {
@@ -475,7 +415,7 @@ function registerHandlers() {
       if (!accessToken) return { success: false, error: 'Not signed in' };
       const { filePath: savePath } = await dialog.showSaveDialog({ defaultPath: filePath.split('/').pop() });
       if (!savePath) return { success: false, error: 'No save location' };
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media`;
       const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!response.ok) {
@@ -494,7 +434,7 @@ function registerHandlers() {
     try {
       const accessToken = googleController.getAccessToken();
       if (!accessToken) return { success: false, error: 'Not signed in' };
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const metadataUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filePath)}`;
       const metadataResponse = await fetch(metadataUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       const metadata = await metadataResponse.json();
@@ -515,7 +455,7 @@ function registerHandlers() {
     try {
       const accessToken = googleController.getAccessToken();
       if (!accessToken) return { success: false, error: 'Not signed in' };
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}/o/${encodeURIComponent(filePath)}`;
       const response = await fetch(url, {
         method: 'DELETE',
@@ -535,7 +475,7 @@ function registerHandlers() {
     try {
       const accessToken = googleController.getAccessToken();
       if (!accessToken) return { success: false, error: 'Not signed in' };
-      const bucketName = await getStorageBucketName(projectId, accessToken);
+      const bucketName = await resolveOauthBucket(projectId, accessToken);
       const placeholderPath = folderPath.endsWith('/') ? folderPath + '.placeholder' : folderPath + '/.placeholder';
       const url = `https://storage.googleapis.com/upload/storage/v1/b/${bucketName}/o?uploadType=media&name=${encodeURIComponent(placeholderPath)}`;
       const response = await fetch(url, {

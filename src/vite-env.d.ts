@@ -4,6 +4,7 @@
 interface FirestoreDocument {
   id: string;
   data: Record<string, unknown>;
+  missing?: boolean;
 }
 
 interface FirestoreCollection {
@@ -88,6 +89,7 @@ interface GoogleDeleteDocumentParams {
   collectionPath: string;
   documentId: string;
   databaseId?: string;
+  recursive?: boolean;
 }
 
 interface StructuredQueryParams {
@@ -220,10 +222,13 @@ interface ElectronAPI {
     params: GetDocumentsParams,
   ) => Promise<{ success: boolean; documents?: FirestoreDocument[]; error?: string }>;
   getDocument: (documentPath: string) => Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }>;
+  listSubcollections: (documentPath: string) => Promise<{ success: boolean; collections?: string[]; error?: string }>;
   createDocument: (params: CreateDocumentParams) => Promise<{ success: boolean; error?: string }>;
   updateDocument: (params: SetDocumentParams) => Promise<{ success: boolean; error?: string }>;
   setDocument: (params: SetDocumentParams) => Promise<{ success: boolean; error?: string }>;
-  deleteDocument: (documentPath: string) => Promise<{ success: boolean; error?: string }>;
+  deleteDocument: (
+    params: string | { documentPath: string; recursive?: boolean },
+  ) => Promise<{ success: boolean; error?: string }>;
   deleteCollection: (collectionPath: string) => Promise<{ success: boolean; error?: string }>;
 
   // Query
@@ -257,6 +262,11 @@ interface ElectronAPI {
     documentPath: string;
     databaseId?: string;
   }) => Promise<{ success: boolean; document?: Record<string, unknown>; error?: string }>;
+  googleListSubcollections: (params: {
+    projectId: string;
+    documentPath: string;
+    databaseId?: string;
+  }) => Promise<{ success: boolean; collections?: string[]; error?: string }>;
   googleSetDocument: (params: GoogleSetDocumentParams) => Promise<{ success: boolean; error?: string }>;
   googleDeleteDocument: (params: GoogleDeleteDocumentParams) => Promise<{ success: boolean; error?: string }>;
   googleExecuteStructuredQuery: (

@@ -757,6 +757,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
 
             {viewMode === 'tree' && (
               <TreeView
+                project={project}
+                firestoreDatabaseId={firestoreDatabaseId}
                 collectionPath={collectionPath}
                 documents={documents}
                 expandedNodes={expandedNodes}
@@ -810,7 +812,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete {selectedRows.length} selected document
-            {selectedRows.length > 1 ? 's' : ''}? This action cannot be undone.
+            {selectedRows.length > 1 ? 's' : ''}? All nested subcollections will also be permanently deleted. This
+            action cannot be undone.
           </DialogContentText>
           {selectedRows.length <= 10 && (
             <Box sx={{ mt: 2, maxHeight: 200, overflow: 'auto' }}>

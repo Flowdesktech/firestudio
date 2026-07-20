@@ -6,6 +6,7 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const vm = require('vm');
+const { fetchDocumentsPage } = require('./firestore/documentList');
 
 let adminRef = null;
 let dbRef = null;
@@ -52,19 +53,7 @@ function registerHandlers() {
   ipcMain.handle('firestore:getDocuments', async (event, { collectionPath, limit = 50, startAfter = null }) => {
     try {
       if (!dbRef) throw new Error('Not connected to Firebase');
-
-      let query = dbRef.collection(collectionPath).limit(limit);
-      if (startAfter) {
-        const startDoc = await dbRef.collection(collectionPath).doc(startAfter).get();
-        if (startDoc.exists) query = query.startAfter(startDoc);
-      }
-
-      const snapshot = await query.get();
-      const documents = [];
-      snapshot.forEach((doc) => {
-        documents.push({ id: doc.id, data: doc.data(), path: doc.ref.path });
-      });
-
+      const documents = await fetchDocumentsPage(dbRef, { collectionPath, limit, startAfter });
       return { success: true, documents };
     } catch (error) {
       return { success: false, error: error.message };
@@ -90,6 +79,16 @@ function registerHandlers() {
       };
     } catch (error) {
       return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('firestore:listSubcollections', async (event, documentPath) => {
+    try {
+      if (!dbRef) throw new Error('Not connected to Firebase');
+      const collections = await dbRef.doc(documentPath).listCollections();
+      return { success: true, collections: collections.map((col) => col.id) };
+    } catch (error) {
+      return { success: false, error: normalizeFirestoreError(error) };
     }
   });
 
@@ -130,10 +129,12 @@ function registerHandlers() {
   });
 
   // Delete document
-  ipcMain.handle('firestore:deleteDocument', async (event, documentPath) => {
+  ipcMain.handle('firestore:deleteDocument', async (event, params) => {
     try {
       if (!dbRef) throw new Error('Not connected to Firebase');
-      await dbRef.doc(documentPath).delete();
+      const { documentPath, recursive = true } = typeof params === 'string' ? { documentPath: params } : params;
+      if (recursive) await dbRef.recursiveDelete(dbRef.doc(documentPath));
+      else await dbRef.doc(documentPath).delete();
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -281,17 +282,8 @@ function registerHandlers() {
   ipcMain.handle('firestore:deleteCollection', async (event, collectionPath) => {
     try {
       if (!dbRef) throw new Error('Not connected to Firebase');
-      const snapshot = await dbRef.collection(collectionPath).get();
-      const batch = dbRef.batch();
-      let count = 0;
-
-      snapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        count++;
-      });
-      if (count > 0) await batch.commit();
-
-      return { success: true, count };
+      await dbRef.recursiveDelete(dbRef.collection(collectionPath));
+      return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
     }

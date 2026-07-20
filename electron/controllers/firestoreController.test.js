@@ -92,6 +92,95 @@ describe('firestoreController', () => {
     expect(result.error).toContain('Permission denied');
   });
 
+  // ─── getDocuments ────────────────────────────────────────────────────────
+
+  it('getDocuments includes phantom documents alongside query results', async () => {
+    const snapshot = {
+      docs: [
+        { id: 'a', data: () => ({ n: 1 }), ref: { path: 'col/a' } },
+        { id: 'c', data: () => ({ n: 3 }), ref: { path: 'col/c' } },
+      ],
+      size: 2,
+    };
+    const mockCollection = {
+      limit: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue(snapshot) }),
+      listDocuments: vi.fn().mockResolvedValue([
+        { id: 'a', path: 'col/a' },
+        { id: 'b', path: 'col/b' },
+        { id: 'c', path: 'col/c' },
+      ]),
+    };
+    setRefs(null, { collection: vi.fn().mockReturnValue(mockCollection) });
+
+    const result = await handlers['firestore:getDocuments'](null, { collectionPath: 'col' });
+
+    expect(result.success).toBe(true);
+    expect(result.documents.map((d) => d.id)).toEqual(['a', 'b', 'c']);
+    expect(result.documents[1]).toEqual({ id: 'b', data: {}, path: 'col/b', missing: true });
+  });
+
+  it('getDocuments falls back to query results when listDocuments fails', async () => {
+    const snapshot = { docs: [{ id: 'a', data: () => ({}), ref: { path: 'col/a' } }], size: 1 };
+    const mockCollection = {
+      limit: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue(snapshot) }),
+      listDocuments: vi.fn().mockRejectedValue(new Error('unavailable')),
+    };
+    setRefs(null, { collection: vi.fn().mockReturnValue(mockCollection) });
+
+    const result = await handlers['firestore:getDocuments'](null, { collectionPath: 'col' });
+
+    expect(result.success).toBe(true);
+    expect(result.documents.map((d) => d.id)).toEqual(['a']);
+  });
+
+  // ─── listSubcollections ──────────────────────────────────────────────────
+
+  it('listSubcollections returns subcollection ids for a document path', async () => {
+    const listCollections = vi.fn().mockResolvedValue([{ id: 'sub1' }, { id: 'sub2' }]);
+    setRefs(null, { doc: vi.fn().mockReturnValue({ listCollections }) });
+
+    const result = await handlers['firestore:listSubcollections'](null, 'col/doc1');
+
+    expect(result.success).toBe(true);
+    expect(result.collections).toEqual(['sub1', 'sub2']);
+  });
+
+  // ─── recursive deletes ───────────────────────────────────────────────────
+
+  it('deleteDocument deletes the document tree recursively', async () => {
+    const docRef = { path: 'col/doc1' };
+    const recursiveDelete = vi.fn().mockResolvedValue(undefined);
+    setRefs(null, { doc: vi.fn().mockReturnValue(docRef), recursiveDelete });
+
+    const result = await handlers['firestore:deleteDocument'](null, 'col/doc1');
+
+    expect(result.success).toBe(true);
+    expect(recursiveDelete).toHaveBeenCalledWith(docRef);
+  });
+
+  it('deleteDocument performs a shallow delete when recursive is false', async () => {
+    const shallowDelete = vi.fn().mockResolvedValue(undefined);
+    const recursiveDelete = vi.fn();
+    setRefs(null, { doc: vi.fn().mockReturnValue({ delete: shallowDelete }), recursiveDelete });
+
+    const result = await handlers['firestore:deleteDocument'](null, { documentPath: 'col/doc1', recursive: false });
+
+    expect(result.success).toBe(true);
+    expect(shallowDelete).toHaveBeenCalled();
+    expect(recursiveDelete).not.toHaveBeenCalled();
+  });
+
+  it('deleteCollection deletes the collection tree recursively', async () => {
+    const collectionRef = { path: 'col' };
+    const recursiveDelete = vi.fn().mockResolvedValue(undefined);
+    setRefs(null, { collection: vi.fn().mockReturnValue(collectionRef), recursiveDelete });
+
+    const result = await handlers['firestore:deleteCollection'](null, 'col');
+
+    expect(result.success).toBe(true);
+    expect(recursiveDelete).toHaveBeenCalledWith(collectionRef);
+  });
+
   // ─── executeJsQuery ──────────────────────────────────────────────────────
 
   it('executeJsQuery has Firestore types in sandbox', async () => {
