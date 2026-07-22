@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCollections: () => ipcRenderer.invoke('firestore:getCollections'),
   getDocuments: (params) => ipcRenderer.invoke('firestore:getDocuments', params),
   getDocument: (documentPath) => ipcRenderer.invoke('firestore:getDocument', documentPath),
+  listSubcollections: (documentPath) => ipcRenderer.invoke('firestore:listSubcollections', documentPath),
   createDocument: (params) => ipcRenderer.invoke('firestore:createDocument', params),
   updateDocument: (params) => ipcRenderer.invoke('firestore:updateDocument', params),
   setDocument: (params) => ipcRenderer.invoke('firestore:setDocument', params),
@@ -58,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   googleGetCollections: (params) => ipcRenderer.invoke('google:getCollections', params),
   googleGetDocuments: (params) => ipcRenderer.invoke('google:getDocuments', params),
   googleGetDocument: (params) => ipcRenderer.invoke('google:getDocument', params),
+  googleListSubcollections: (params) => ipcRenderer.invoke('google:listSubcollections', params),
   googleSetDocument: (params) => ipcRenderer.invoke('google:setDocument', params),
 
   // Firebase Storage operations (Service Account)

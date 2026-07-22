@@ -22,6 +22,7 @@ export interface DocumentData {
 export interface Document {
   id: string;
   data: DocumentData;
+  missing?: boolean;
 }
 
 export interface Filter {
@@ -525,9 +526,10 @@ export const renameCollection = createAppAsyncThunk<
             collectionPath: currentPath,
             documentId: doc.id,
             databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
+            recursive: false,
           });
         } else {
-          await electron.deleteDocument(`${currentPath}/${doc.id}`);
+          await electron.deleteDocument({ documentPath: `${currentPath}/${doc.id}`, recursive: false });
         }
       }
 

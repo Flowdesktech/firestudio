@@ -37,7 +37,8 @@ const DeleteCollectionDialog: React.FC<DeleteCollectionDialogProps> = ({ open, o
           Are you sure you want to delete the collection <strong>&quot;{collection}&quot;</strong>?
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          This will permanently delete all documents in this collection. This action cannot be undone.
+          This will permanently delete all documents in this collection, including their nested subcollections. This
+          action cannot be undone.
         </Typography>
       </DialogContent>
       <DialogActions>

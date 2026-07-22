@@ -11,6 +11,7 @@ const http = require('http');
 const net = require('net');
 const fetch = require('node-fetch');
 const { convertToFirestoreValue, parseFirestoreDocument } = require('../utils/firestoreHelpers');
+const { deleteDocumentTree, listCollectionIds } = require('./firestore/recursiveDeleteRest');
 
 /** Path segment for Firestore REST: "(default)" literal or percent-encoded custom id */
 function firestoreDbPathSegment(databaseId) {
@@ -492,7 +493,7 @@ function registerHandlers() {
     try {
       const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
       const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}?pageSize=${limit}`,
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}?pageSize=${limit}&showMissing=true`,
       );
       if (!result.ok) return result.error;
 
@@ -502,14 +503,33 @@ function registerHandlers() {
       const documents = (data.documents || []).map((doc) => {
         const pathParts = doc.name.split('/');
         const docId = pathParts[pathParts.length - 1];
+        const missing = !doc.createTime && !doc.fields;
         return {
           id: docId,
           data: parseFirestoreDocument(doc.fields || {}),
           path: collectionPath + '/' + docId,
+          ...(missing ? { missing: true } : {}),
         };
       });
       return { success: true, documents };
     } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google:listSubcollections', async (event, { projectId, documentPath, databaseId }) => {
+    try {
+      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
+      const collections = await listCollectionIds(
+        {
+          authenticatedFetch,
+          urlRoot: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents`,
+        },
+        documentPath,
+      );
+      return { success: true, collections };
+    } catch (error) {
+      if (error.ipcResult) return error.ipcResult;
       return { success: false, error: error.message };
     }
   });
@@ -636,25 +656,37 @@ function registerHandlers() {
   });
 
   // Delete Document
-  ipcMain.handle('google:deleteDocument', async (event, { projectId, collectionPath, documentId, databaseId }) => {
-    try {
-      const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
-      const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents/${collectionPath}/${documentId}`,
-        { method: 'DELETE' },
-      );
-      if (!result.ok) return result.error;
+  ipcMain.handle(
+    'google:deleteDocument',
+    async (event, { projectId, collectionPath, documentId, databaseId, recursive = true }) => {
+      try {
+        const resolvedDatabaseId = databaseIdFromHandlerParams({ databaseId });
+        const dbSeg = firestoreDbPathSegment(resolvedDatabaseId);
+        const urlRoot = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents`;
+        const docPath = `${collectionPath}/${documentId}`;
 
-      const data = result.data;
-      // DELETE returns empty response on success
-      if (data && data.error) {
-        return { success: false, error: data.error.message, requiresReauth: data.error.code === 401 };
+        if (recursive) {
+          await deleteDocumentTree({
+            authenticatedFetch,
+            urlRoot,
+            nameRoot: `projects/${projectId}/databases/${resolvedDatabaseId}/documents`,
+            docPath,
+          });
+          return { success: true };
+        }
+
+        const result = await authenticatedFetch(`${urlRoot}/${docPath}`, { method: 'DELETE' });
+        if (!result.ok) return result.error;
+        if (result.data && result.data.error) {
+          return { success: false, error: result.data.error.message, requiresReauth: result.data.error.code === 401 };
+        }
+        return { success: true };
+      } catch (error) {
+        if (error.ipcResult) return error.ipcResult;
+        return { success: false, error: error.message };
       }
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
+    },
+  );
 
   // ============================================
   // Firebase Authentication (Identity Toolkit API)

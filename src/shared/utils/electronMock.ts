@@ -26,6 +26,9 @@ const mockElectronAPI: ElectronAPI = {
   getDocument: async (_documentPath: string) => {
     return { success: false, error: 'Requires Electron mode' };
   },
+  listSubcollections: async (_documentPath: string) => {
+    return { success: false, error: 'Requires Electron mode' };
+  },
   createDocument: async (_params: CreateDocumentParams) => {
     return { success: false, error: 'Requires Electron mode' };
   },
@@ -35,7 +38,7 @@ const mockElectronAPI: ElectronAPI = {
   setDocument: async (_params: SetDocumentParams) => {
     return { success: false, error: 'Requires Electron mode' };
   },
-  deleteDocument: async (_documentPath: string) => {
+  deleteDocument: async (_params: string | { documentPath: string; recursive?: boolean }) => {
     return { success: false, error: 'Requires Electron mode' };
   },
   deleteCollection: async (_collectionPath: string) => {
@@ -101,6 +104,9 @@ const mockElectronAPI: ElectronAPI = {
   },
   googleGetDocument: async (_params: { projectId: string; documentPath: string }) => {
     console.warn('[Mock] googleGetDocument requires Electron mode');
+    return { success: false, error: 'Requires Electron mode' };
+  },
+  googleListSubcollections: async (_params: { projectId: string; documentPath: string; databaseId?: string }) => {
     return { success: false, error: 'Requires Electron mode' };
   },
   googleExecuteStructuredQuery: async (_params: StructuredQueryParams) => {
