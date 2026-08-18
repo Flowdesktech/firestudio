@@ -433,17 +433,10 @@ function registerHandlers() {
               let collections = [];
               try {
                 const dbSeg = firestoreDbPathSegment(databaseId);
-                const colResult = await authenticatedFetch(
-                  `https://firestore.googleapis.com/v1/projects/${p.projectId}/databases/${dbSeg}/documents:listCollectionIds`,
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
-                  },
-                );
-                if (colResult.ok && colResult.data.collectionIds) {
-                  collections = colResult.data.collectionIds;
-                }
+                collections = await listCollectionIds({
+                  authenticatedFetch,
+                  urlRoot: `https://firestore.googleapis.com/v1/projects/${p.projectId}/databases/${dbSeg}/documents`,
+                });
               } catch (error) {
                 void error;
               }
@@ -475,16 +468,13 @@ function registerHandlers() {
       }
       const databaseId = typeof params === 'object' && params ? databaseIdFromHandlerParams(params) : '(default)';
       const dbSeg = firestoreDbPathSegment(databaseId);
-      const result = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:listCollectionIds`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
-      );
-      if (!result.ok) return result.error;
-
-      const data = result.data;
-      if (data.error) return { success: false, error: data.error.message, requiresReauth: data.error.code === 401 };
-      return { success: true, collections: data.collectionIds || [] };
+      const collections = await listCollectionIds({
+        authenticatedFetch,
+        urlRoot: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents`,
+      });
+      return { success: true, collections };
     } catch (error) {
+      if (error.ipcResult) return error.ipcResult;
       return { success: false, error: error.message };
     }
   });
@@ -876,18 +866,16 @@ function registerHandlers() {
   ipcMain.handle('google:exportCollections', async (event, { projectId, databaseId }) => {
     try {
       const dbSeg = firestoreDbPathSegment(databaseIdFromHandlerParams({ databaseId }));
-      // First get all collection IDs
-      const colResult = await authenticatedFetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents:listCollectionIds`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
-      );
-      if (!colResult.ok) return colResult.error;
-
-      const colData = colResult.data;
-      if (colData.error)
-        return { success: false, error: colData.error.message, requiresReauth: colData.error.code === 401 };
-
-      const collectionIds = colData.collectionIds || [];
+      let collectionIds = [];
+      try {
+        collectionIds = await listCollectionIds({
+          authenticatedFetch,
+          urlRoot: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbSeg}/documents`,
+        });
+      } catch (error) {
+        if (error.ipcResult) return error.ipcResult;
+        return { success: false, error: error.message };
+      }
       const allData = {};
       const pageSize = 300;
 
