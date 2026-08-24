@@ -45,6 +45,13 @@ function normalizeHost(host) {
  * emulator placeholder.
  */
 function readProjectIdGuess() {
+  // Honor the project id the emulator was started with. The gcloud Firestore
+  // emulator (and the Firebase Emulator Suite) advertise it via these vars;
+  // without this, discovery falls back to the generic `demo-project` and the
+  // connection's project id won't match the emulator's, returning no data.
+  const envProject = process.env.FIRESTORE_EMULATOR_PROJECT || process.env.GCLOUD_PROJECT;
+  if (envProject) return envProject;
+
   let dir = process.cwd();
   for (let i = 0; i < 12; i++) {
     const rc = readJsonSafely(path.join(dir, '.firebaserc'));
