@@ -33,6 +33,9 @@ function readJsonSafely(filePath) {
  */
 function normalizeHost(host) {
   if (!host) return host;
+  // `localhost` resolves to IPv6 `::1` for gRPC clients and can hang/fail to
+  // connect; route it to the IPv4 loopback, which emulators reliably serve.
+  if (host === 'localhost') return '127.0.0.1';
   if (host === '0.0.0.0') return '127.0.0.1';
   if (host === '[::]' || host === '::' || host === '::1' || host === '[::1]') return '127.0.0.1';
   return host;
