@@ -25,6 +25,88 @@ function readJsonSafely(filePath) {
 }
 
 /**
+ * Normalizes a host that is not directly reachable from a client.
+ * Emulators bind to 0.0.0.0 (IPv4) or [::] (IPv6) by default and report those
+ * addresses back via the environment. Browsers (and some runtimes) cannot
+ * connect to 0.0.0.0 / [::] as a destination, which breaks discovery on macOS
+ * in particular. Map those wildcard addresses to the loopback interface.
+ */
+function normalizeHost(host) {
+  if (!host) return host;
+  // `localhost` resolves to IPv6 `::1` for gRPC clients and can hang/fail to
+  // connect; route it to the IPv4 loopback, which emulators reliably serve.
+  if (host === 'localhost') return '127.0.0.1';
+  if (host === '0.0.0.0') return '127.0.0.1';
+  if (host === '[::]' || host === '::' || host === '::1' || host === '[::1]') return '127.0.0.1';
+  return host;
+}
+
+/**
+ * Best-effort project ID guess for emulators discovered via environment
+ * variables (which do not carry a project ID). Reads .firebaserc by walking up
+ * from the current directory, then falls back to Firebase's conventional
+ * emulator placeholder.
+ */
+function readProjectIdGuess() {
+  // Honor the project id the emulator was started with. The gcloud Firestore
+  // emulator (and the Firebase Emulator Suite) advertise it via these vars;
+  // without this, discovery falls back to the generic `demo-project` and the
+  // connection's project id won't match the emulator's, returning no data.
+  const envProject = process.env.FIRESTORE_EMULATOR_PROJECT || process.env.GCLOUD_PROJECT;
+  if (envProject) return envProject;
+
+  let dir = process.cwd();
+  for (let i = 0; i < 12; i++) {
+    const rc = readJsonSafely(path.join(dir, '.firebaserc'));
+    if (rc && rc.projects) {
+      const id = rc.projects.default || Object.keys(rc.projects)[0];
+      if (id) return id;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return 'demo-project';
+}
+
+/**
+ * Parses a host:port string, normalizing the host. Returns null if malformed.
+ */
+function parseHostPort(value) {
+  if (!value) return null;
+  const idx = value.lastIndexOf(':');
+  if (idx === -1) return null;
+  const host = normalizeHost(value.slice(0, idx)) || '127.0.0.1';
+  const port = parseInt(value.slice(idx + 1), 10);
+  if (!Number.isFinite(port)) return null;
+  return { host, port };
+}
+
+/**
+ * Discovers emulators from standard Firebase Emulator environment variables
+ * (FIRESTORE_EMULATOR_HOST, FIREBASE_AUTH_EMULATOR_HOST,
+ * FIREBASE_STORAGE_EMULATOR_HOST). These are exported by the Emulator Suite and
+ * are an authoritative signal of a running emulator.
+ */
+function scanEnv() {
+  const firestore = parseHostPort(process.env.FIRESTORE_EMULATOR_HOST);
+  if (!firestore) return null;
+
+  const services = { firestore };
+  const auth = parseHostPort(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if (auth) services.auth = auth;
+  const storage = parseHostPort(process.env.FIREBASE_STORAGE_EMULATOR_HOST);
+  if (storage) services.storage = storage;
+
+  return {
+    projectId: readProjectIdGuess(),
+    host: firestore.host,
+    port: firestore.port,
+    services,
+  };
+}
+
+/**
  * Scans the OS temp directory for running emulator hub files.
  * The hub locator file (hub-<projectId>.json) only contains version, origins, and pid.
  * To get the running emulator services, we must fetch GET /emulators from the hub.
@@ -86,6 +168,30 @@ async function scanHubFiles() {
 }
 
 /**
+ * Merges all discovery strategies (hub locator files and environment
+ * variables), de-duplicating by Firestore host:port so a single running
+ * emulator is not reported multiple times.
+ */
+async function scanRunningEmulators() {
+  const results = [];
+  const seen = new Set();
+  const add = (emulator) => {
+    if (!emulator) return;
+    const key = `${emulator.host}:${emulator.port}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    results.push(emulator);
+  };
+
+  const fromFiles = await scanHubFiles();
+  fromFiles.forEach(add);
+
+  add(scanEnv());
+
+  return results;
+}
+
+/**
  * Scans the Firebase CLI configstore to map project IDs to local paths
  */
 function scanConfigstore() {
@@ -116,10 +222,10 @@ function scanConfigstore() {
  * Registers all Emulator IPC handlers
  */
 function registerHandlers() {
-  // Scans for running emulators via hub files
+  // Scans for running emulators via hub files and environment variables
   ipcMain.handle('emulators:scanHub', async () => {
     try {
-      const emulators = await scanHubFiles();
+      const emulators = await scanRunningEmulators();
       return { success: true, emulators };
     } catch (err) {
       return { success: false, error: err.message };
@@ -139,4 +245,5 @@ function registerHandlers() {
 
 module.exports = {
   registerHandlers,
+  scanRunningEmulators,
 };

@@ -1,6 +1,6 @@
 {
   "name": "firestudio",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "A powerful open-source GUI client for Firebase Firestore",
   "main": "electron/main.js",
   "scripts": {
@@ -24,11 +24,13 @@
     "release:mac": "pnpm run build && electron-builder --mac --publish always",
     "release:linux": "pnpm run build && electron-builder --linux --publish always",
     "generate-icon": "node scripts/generate-icon.js",
+    "ensure-electron": "node scripts/ensure-electron.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "postinstall": "node scripts/ensure-electron.js"
   },
   "keywords": [
     "firebase",
