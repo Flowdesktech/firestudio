@@ -54,8 +54,12 @@ function parseFirestoreValue(value) {
   if (value.booleanValue !== undefined) return value.booleanValue;
   if (value.nullValue !== undefined) return null;
   if (value.timestampValue !== undefined) {
-    const date = new Date(value.timestampValue);
-    return { _seconds: Math.floor(date.getTime() / 1000), _nanoseconds: 0 };
+    // REST JSON serializes timestamps as RFC3339 strings, while the admin SDK
+    // gRPC proto exposes them as { seconds, nanos } objects.
+    const ts = value.timestampValue;
+    const seconds = typeof ts === 'string' ? Math.floor(new Date(ts).getTime() / 1000) : Number(ts.seconds);
+    const nanos = typeof ts === 'string' ? 0 : ts.nanos || 0;
+    return { _seconds: seconds, _nanoseconds: nanos };
   }
   if (value.geoPointValue !== undefined) {
     return {
@@ -101,9 +105,21 @@ function dataToFirestoreFields(data) {
   return fields;
 }
 
+/**
+ * Decodes a Firestore document into plain cloneable data.
+ * Unlike doc.data(), references become plain strings instead of
+ * DocumentReference instances, which cannot cross the IPC boundary.
+ * @param {Object} doc - Firestore DocumentSnapshot
+ * @returns {Object} - Plain data object
+ */
+function firestoreDocumentToData(doc) {
+  return parseFirestoreDocument(doc._fieldsProto || {});
+}
+
 module.exports = {
   convertToFirestoreValue,
   parseFirestoreValue,
   parseFirestoreDocument,
   dataToFirestoreFields,
+  firestoreDocumentToData,
 };

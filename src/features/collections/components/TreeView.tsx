@@ -1,33 +1,38 @@
 import React, { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme } from '@mui/material';
 import { FirestoreValue } from '../../../shared/utils/firestoreUtils';
-import { Document } from '../store/collectionSlice';
-import { Project } from '../../projects/store/projectsSlice';
-import { useTreeSubcollections } from '../hooks/useTreeSubcollections';
+import { Document, DocumentData } from '../store/collectionSlice';
 import TreeNodeRow from './tree/TreeNodeRow';
-import { TreeContext, TreeContextValue } from './tree/TreeContext';
+import { TreeContext, TreeContextValue, TreeEditingCell } from './tree/TreeContext';
 
 interface TreeViewProps {
-  project: Project;
-  firestoreDatabaseId?: string;
   collectionPath: string;
   documents: Document[];
   expandedNodes: Record<string, boolean>;
   toggleNode: (path: string) => void;
-  editingCell: { docId: string; field: string } | null;
+  editingCell: TreeEditingCell | null;
   editValue: string;
   setEditValue: (value: string) => void;
-  onCellEdit: (docId: string | null, field: string | null, value: FirestoreValue) => void;
+  onCellEdit: (
+    docId: string | null,
+    field: string | null,
+    value: FirestoreValue,
+    docData?: DocumentData | boolean,
+    docCollectionPath?: string,
+  ) => void;
   onCellSave: () => void;
   onCellKeyDown: (e: React.KeyboardEvent) => void;
   getType: (value: FirestoreValue) => string;
   getTypeColor: (type: string, isDark: boolean) => string;
   formatValue: (value: FirestoreValue, type: string) => string;
+  subcollectionsByDocPath: Record<string, string[]>;
+  documentsByPath: Record<string, Document[]>;
+  ensureSubcollections: (docPath: string) => void;
+  ensureDocuments: (collectionPath: string) => void;
+  refreshDocuments: (collectionPath: string) => void;
 }
 
 const TreeView: React.FC<TreeViewProps> = ({
-  project,
-  firestoreDatabaseId,
   collectionPath,
   documents,
   expandedNodes,
@@ -41,13 +46,14 @@ const TreeView: React.FC<TreeViewProps> = ({
   getType,
   getTypeColor,
   formatValue,
+  subcollectionsByDocPath,
+  documentsByPath,
+  ensureSubcollections,
+  ensureDocuments,
+  refreshDocuments,
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
-  const { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments } = useTreeSubcollections(
-    project,
-    firestoreDatabaseId,
-  );
 
   const contextValue = useMemo<TreeContextValue>(
     () => ({
@@ -69,6 +75,7 @@ const TreeView: React.FC<TreeViewProps> = ({
       documentsByPath,
       ensureSubcollections,
       ensureDocuments,
+      refreshDocuments,
     }),
     [
       collectionPath,
@@ -89,6 +96,7 @@ const TreeView: React.FC<TreeViewProps> = ({
       documentsByPath,
       ensureSubcollections,
       ensureDocuments,
+      refreshDocuments,
     ],
   );
 

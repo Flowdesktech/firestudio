@@ -46,7 +46,6 @@ import { RootState, AppDispatch } from '../../../app/store';
 import { Project } from '../../projects/store/projectsSlice';
 import { buildCollectionStateKey } from '../../projects/utils/firestoreDatabaseUtils';
 import { FirestoreValue } from '../../../shared/utils/firestoreUtils';
-import { isFirestoreTimestamp, isIsoDateString, isUnixTimestampMs } from '../../../shared/utils/dateUtils';
 
 // Utilities
 import {
@@ -55,6 +54,7 @@ import {
   getTypeColor,
   parseEditValue,
   serializeForEdit,
+  normalizeEditedValue,
   extractAllFields,
   processDocuments,
   getVisibleFields,
@@ -71,6 +71,7 @@ import ViewTabs from './ViewTabs';
 import TableView from './TableView';
 import TreeView from './TreeView';
 import JsonView from './JsonView';
+import { useTreeSubcollections } from '../hooks/useTreeSubcollections';
 import CreateDocumentDialog from './CreateDocumentDialog';
 import SettingsDialog from '../../../app/components/SettingsDialog';
 
@@ -81,6 +82,8 @@ interface EditingCell {
   field: string;
   originalValue?: FirestoreValue;
   originalType?: string;
+  docData?: DocumentData;
+  docCollectionPath?: string;
 }
 
 interface CollectionTabProps {
@@ -379,6 +382,10 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Nested subcollection data (shared with the tree view so saves can refresh it)
+  const { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments, refreshDocuments } =
+    useTreeSubcollections(project, firestoreDatabaseId);
+
   // Initialize expanded nodes when documents load
   useEffect(() => {
     if (documents.length > 0) {
@@ -458,19 +465,35 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
   }, []);
 
   // Cell Editing Handlers
-  const handleCellEdit = useCallback((docId: string | null, field: string | null, value: FirestoreValue) => {
-    // If called with null values, clear editing state (cancel operation)
-    if (docId === null || field === null) {
-      setEditingCell(null);
-      setEditValue('');
-      return;
-    }
+  const handleCellEdit = useCallback(
+    (
+      docId: string | null,
+      field: string | null,
+      value: FirestoreValue,
+      docData?: DocumentData | boolean,
+      docCollectionPath?: string,
+    ) => {
+      // If called with null values, clear editing state (cancel operation)
+      if (docId === null || field === null) {
+        setEditingCell(null);
+        setEditValue('');
+        return;
+      }
 
-    const type = getValueType(value);
-    // Store original value for type preservation when saving
-    setEditingCell({ docId, field, originalValue: value, originalType: type });
-    setEditValue(serializeForEdit(value, type));
-  }, []);
+      const type = getValueType(value);
+      // Store original value for type preservation when saving
+      setEditingCell({
+        docId,
+        field,
+        originalValue: value,
+        originalType: type,
+        docData: docData && typeof docData === 'object' ? docData : undefined,
+        docCollectionPath: docCollectionPath && typeof docCollectionPath === 'string' ? docCollectionPath : undefined,
+      });
+      setEditValue(serializeForEdit(value, type));
+    },
+    [],
+  );
 
   // Save cell - can pass explicit docId, field, value for direct saving (avoids stale closure issues)
   const handleCellSave = useCallback(
@@ -481,30 +504,19 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
 
       if (!docId || !field) return;
 
-      const doc = documents.find((d) => d.id === docId);
-      if (!doc) return;
+      // Subcollection documents are saved to their own collection path; root docs keep the tab's path
+      const targetCollectionPath = editingCell?.docCollectionPath ?? collectionPath;
+      const docData =
+        editingCell?.docData && typeof editingCell.docData === 'object'
+          ? editingCell.docData
+          : documents.find((d) => d.id === docId)?.data;
+      if (!docData) return;
 
-      const oldValue = editingCell?.originalValue ?? doc.data?.[field];
+      const oldValue = editingCell?.originalValue ?? docData[field];
 
       // Determine the new value - use explicit if provided, otherwise parse editValue
-      let newValue: FirestoreValue;
-      if (explicitValue !== undefined) {
-        newValue = explicitValue;
-      } else {
-        newValue = parseEditValue(editValue);
-
-        // Preserve original type for timestamps
-        if (isFirestoreTimestamp(oldValue) && typeof newValue === 'string' && isIsoDateString(newValue)) {
-          const date = new Date(newValue);
-          newValue = {
-            _seconds: Math.floor(date.getTime() / 1000),
-            _nanoseconds: 0,
-          };
-        } else if (isUnixTimestampMs(oldValue) && typeof newValue === 'string' && isIsoDateString(newValue)) {
-          const date = new Date(newValue);
-          newValue = date.getTime();
-        }
-      }
+      let newValue: FirestoreValue = explicitValue !== undefined ? explicitValue : parseEditValue(editValue);
+      newValue = normalizeEditedValue(newValue, oldValue);
 
       // Skip if unchanged
       if (JSON.stringify(oldValue) === JSON.stringify(newValue)) {
@@ -512,26 +524,40 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
         return;
       }
 
-      const newData = { ...doc.data, [field]: newValue };
+      const newData = { ...docData, [field]: newValue };
 
       try {
         await dispatch(
           updateDocument({
             project,
-            collection: collectionPath,
+            collection: targetCollectionPath,
             docId,
             docData: newData,
             firestoreDatabaseId,
           }),
         ).unwrap();
         showMessage?.(`Updated document ${docId}`, 'success');
+        if (targetCollectionPath !== collectionPath) {
+          refreshDocuments(targetCollectionPath);
+        }
       } catch (error) {
         showError(error);
       }
 
       setEditingCell(null);
     },
-    [editingCell, editValue, documents, dispatch, project, collectionPath, firestoreDatabaseId, showMessage, showError],
+    [
+      editingCell,
+      editValue,
+      documents,
+      dispatch,
+      project,
+      collectionPath,
+      firestoreDatabaseId,
+      refreshDocuments,
+      showMessage,
+      showError,
+    ],
   );
 
   const handleCellKeyDown = useCallback(
@@ -757,8 +783,6 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
 
             {viewMode === 'tree' && (
               <TreeView
-                project={project}
-                firestoreDatabaseId={firestoreDatabaseId}
                 collectionPath={collectionPath}
                 documents={documents}
                 expandedNodes={expandedNodes}
@@ -774,6 +798,11 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
                 getType={getType}
                 getTypeColor={getColor}
                 formatValue={formatValue}
+                subcollectionsByDocPath={subcollectionsByDocPath}
+                documentsByPath={documentsByPath}
+                ensureSubcollections={ensureSubcollections}
+                ensureDocuments={ensureDocuments}
+                refreshDocuments={refreshDocuments}
               />
             )}
 

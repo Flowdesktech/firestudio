@@ -15,6 +15,7 @@ export {
   parseFirestoreValue,
   parseEditValue,
   serializeForEdit,
+  normalizeEditedValue,
 } from './firestoreUtils';
 
 // Query parsing and building utilities

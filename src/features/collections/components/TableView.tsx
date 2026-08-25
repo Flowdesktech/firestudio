@@ -86,6 +86,7 @@ const TableView: React.FC<TableViewProps> = ({
   // --- Helpers ---
 
   const shouldUseDialogEditor = (value: FirestoreValue) => {
+    if (isFirestoreTimestamp(value) || value instanceof Date) return false;
     if (Array.isArray(value) || (typeof value === 'object' && value !== null)) return true;
     if (typeof value === 'string') {
       return value.includes('\n') || value.length > LONG_TEXT_THRESHOLD;

@@ -5,6 +5,7 @@ import {
   isUnixTimestampMs,
   isIsoDateString,
   formatDateForDisplay,
+  formatDateForDateTimeLocal,
 } from '../../../../shared/utils/dateUtils';
 import { MONOSPACE_FONT_FAMILY } from '../../../../shared/utils/constants';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
@@ -99,7 +100,7 @@ const CellRenderer: React.FC<CellRendererProps> = ({
         }
 
         if (!isNaN(dateValue.getTime())) {
-          setTempDateValue(dateValue.toISOString().slice(0, 19));
+          setTempDateValue(formatDateForDateTimeLocal(dateValue));
         }
       }
     }

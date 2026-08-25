@@ -7,6 +7,7 @@ const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const vm = require('vm');
 const { fetchDocumentsPage } = require('./firestore/documentList');
+const { firestoreDocumentToData } = require('../utils/firestoreHelpers');
 
 let adminRef = null;
 let dbRef = null;
@@ -72,7 +73,7 @@ function registerHandlers() {
         success: true,
         document: {
           id: doc.id,
-          data: doc.data(),
+          data: firestoreDocumentToData(doc),
           path: doc.ref.path,
           subcollections: subcollections.map((col) => col.id),
         },
@@ -158,7 +159,7 @@ function registerHandlers() {
       const snapshot = await query.get();
       const documents = [];
       snapshot.forEach((doc) => {
-        documents.push({ id: doc.id, data: doc.data(), path: doc.ref.path });
+        documents.push({ id: doc.id, data: firestoreDocumentToData(doc), path: doc.ref.path });
       });
 
       return { success: true, documents };
@@ -175,7 +176,7 @@ function registerHandlers() {
       const snapshot = await dbRef.collection(collectionPath).get();
       const documents = {};
       snapshot.forEach((doc) => {
-        documents[doc.id] = doc.data();
+        documents[doc.id] = firestoreDocumentToData(doc);
       });
 
       const { filePath } = await dialog.showSaveDialog({
@@ -262,14 +263,14 @@ function registerHandlers() {
       const documents = [];
       if (queryResult?.forEach) {
         queryResult.forEach((doc) => {
-          documents.push({ id: doc.id, data: doc.data(), path: doc.ref.path });
+          documents.push({ id: doc.id, data: firestoreDocumentToData(doc), path: doc.ref.path });
         });
       } else if (queryResult?.docs) {
         queryResult.docs.forEach((doc) => {
-          documents.push({ id: doc.id, data: doc.data(), path: doc.ref.path });
+          documents.push({ id: doc.id, data: firestoreDocumentToData(doc), path: doc.ref.path });
         });
       } else if (queryResult?.exists !== undefined && queryResult.exists) {
-        documents.push({ id: queryResult.id, data: queryResult.data(), path: queryResult.ref.path });
+        documents.push({ id: queryResult.id, data: firestoreDocumentToData(queryResult), path: queryResult.ref.path });
       }
 
       return { success: true, documents };
@@ -302,7 +303,7 @@ function registerHandlers() {
         const snapshot = await col.get();
         const documents = {};
         snapshot.forEach((doc) => {
-          documents[doc.id] = doc.data();
+          documents[doc.id] = firestoreDocumentToData(doc);
         });
         allData[col.id] = documents;
       }

@@ -7,6 +7,12 @@ import {
   Description as DocumentIcon,
 } from '@mui/icons-material';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
+import {
+  isFirestoreTimestamp,
+  isUnixTimestampMs,
+  formatDateForDateTimeLocal,
+} from '../../../../shared/utils/dateUtils';
+import { DocumentData } from '../../store/collectionSlice';
 import { TreeContext } from './TreeContext';
 
 interface TreeNodeRowProps {
@@ -14,6 +20,8 @@ interface TreeNodeRowProps {
   value: FirestoreValue;
   path: string;
   docId?: string;
+  docData?: DocumentData;
+  docCollectionPath?: string;
   depth?: number;
   isDoc?: boolean;
   isCollection?: boolean;
@@ -25,6 +33,8 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   value,
   path,
   docId,
+  docData,
+  docCollectionPath,
   depth = 0,
   isDoc = false,
   isCollection = false,
@@ -58,7 +68,21 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   const isExpanded = expandedNodes[path];
   const displayValue = isExpandable ? '' : formatValue(value, nodeType);
   const isEditing =
-    !isCollection && !isDoc && !isExpandable && editingCell?.docId === docId && editingCell?.field === nodeKey;
+    !isCollection &&
+    !isDoc &&
+    !isExpandable &&
+    editingCell?.docId === docId &&
+    editingCell?.field === nodeKey &&
+    (editingCell?.docCollectionPath ?? docCollectionPath) === docCollectionPath;
+  const isDateLike = nodeType === 'Timestamp' || isFirestoreTimestamp(value) || isUnixTimestampMs(value);
+
+  const [dateValue, setDateValue] = React.useState('');
+
+  useEffect(() => {
+    if (isEditing && isDateLike) {
+      setDateValue(formatDateForDateTimeLocal(value));
+    }
+  }, [isEditing, isDateLike, value]);
 
   const isRoot = isCollection && path === rootPath;
   const collectionDocs = isCollection ? (isRoot ? rootDocuments : documentsByPath[path]) : undefined;
@@ -113,24 +137,47 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
         <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider', width: '40%' }}>
           {!isCollection && !isDoc && !isExpandable ? (
             isEditing ? (
-              <TextField
-                size="small"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={onCellSave}
-                onKeyDown={onCellKeyDown}
-                autoFocus
-                sx={{
-                  '& .MuiInputBase-input': {
-                    fontFamily: 'monospace',
-                    fontSize: '0.8rem',
-                    py: 0.5,
-                  },
-                }}
-              />
+              isDateLike ? (
+                <TextField
+                  type="datetime-local"
+                  size="small"
+                  value={dateValue}
+                  onChange={(e) => {
+                    setDateValue(e.target.value);
+                    setEditValue(e.target.value);
+                  }}
+                  onBlur={onCellSave}
+                  onKeyDown={onCellKeyDown}
+                  autoFocus
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      fontFamily: 'monospace',
+                      fontSize: '0.8rem',
+                      py: 0.5,
+                    },
+                  }}
+                />
+              ) : (
+                <TextField
+                  size="small"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={onCellSave}
+                  onKeyDown={onCellKeyDown}
+                  autoFocus
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      fontFamily: 'monospace',
+                      fontSize: '0.8rem',
+                      py: 0.5,
+                    },
+                  }}
+                />
+              )
             ) : (
               <Typography
-                onClick={() => docId && onCellEdit(docId, nodeKey, value)}
+                onClick={() => docId && onCellEdit(docId, nodeKey, value, docData, docCollectionPath)}
                 sx={{
                   fontSize: '0.8rem',
                   color: getTypeColor(nodeType, isDark),
@@ -168,7 +215,9 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
                 nodeKey={doc.id}
                 value={doc.data}
                 path={`${path}/${doc.id}`}
-                docId={isRoot ? doc.id : undefined}
+                docId={doc.id}
+                docData={doc.data}
+                docCollectionPath={path}
                 isDoc
                 depth={depth + 1}
                 missing={doc.missing}
@@ -187,6 +236,8 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
                 value={v}
                 path={`${path}.${k}`}
                 docId={docId}
+                docData={docData}
+                docCollectionPath={docCollectionPath}
                 depth={depth + 1}
               />
             ))}
@@ -202,6 +253,8 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
                     value={v}
                     path={`${path}.${k}`}
                     docId={docId}
+                    docData={docData}
+                    docCollectionPath={docCollectionPath}
                     depth={depth + 1}
                   />
                 ))}

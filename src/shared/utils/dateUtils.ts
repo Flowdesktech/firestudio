@@ -21,6 +21,15 @@ export const isUnixTimestampMs = (value: unknown): value is number => {
   return value > 946684800000 && value < 4102444800000;
 };
 
+/**
+ * Checks if a value is a datetime-local string (no timezone, as emitted by
+ * <input type="datetime-local">). Example: 2024-01-15T10:30 or 2024-01-15T10:30:00
+ */
+export const isDateTimeLocalString = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value);
+};
+
 interface FirestoreTimestamp {
   _seconds?: number;
   seconds?: number;
@@ -78,4 +87,17 @@ export const formatDateForDisplay = (value: unknown, format: 'locale' | 'iso' | 
   if (format === 'time') return date.toLocaleTimeString();
 
   return date.toLocaleString();
+};
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Formats a date value for a <input type="datetime-local"> field.
+ * Uses LOCAL time: datetime-local strings are parsed back as local time,
+ * so this round-trips without a timezone offset shift.
+ */
+export const formatDateForDateTimeLocal = (value: unknown): string => {
+  const date = toDate(value);
+  if (!date || isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 };

@@ -11,6 +11,7 @@ export interface TreeSubcollections {
   documentsByPath: Record<string, Document[]>;
   ensureSubcollections: (docPath: string) => void;
   ensureDocuments: (collectionPath: string) => void;
+  refreshDocuments: (collectionPath: string) => void;
 }
 
 export function useTreeSubcollections(project: Project, firestoreDatabaseId?: string): TreeSubcollections {
@@ -66,5 +67,13 @@ export function useTreeSubcollections(project: Project, firestoreDatabaseId?: st
     [isGoogle, project.projectId, databaseId],
   );
 
-  return { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments };
+  const refreshDocuments = useCallback(
+    async (collectionPath: string) => {
+      requestedPaths.current.delete(`col:${collectionPath}`);
+      await ensureDocuments(collectionPath);
+    },
+    [ensureDocuments],
+  );
+
+  return { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments, refreshDocuments };
 }

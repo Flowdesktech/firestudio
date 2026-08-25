@@ -1,7 +1,9 @@
+const { firestoreDocumentToData } = require('../../utils/firestoreHelpers');
+
 const PHANTOM_SCAN_MAX_DOCS = 1000;
 
 function toDocumentEntry(doc) {
-  return { id: doc.id, data: doc.data(), path: doc.ref.path };
+  return { id: doc.id, data: firestoreDocumentToData(doc), path: doc.ref.path };
 }
 
 function toPhantomEntry(ref) {
