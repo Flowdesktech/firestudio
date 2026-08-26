@@ -197,4 +197,29 @@ describe('projectsSlice thunks', () => {
     // Collections should be normalized to objects
     expect(project.collections).toEqual([{ id: 'col1', path: 'col1' }]);
   });
+
+  it('loadProjects deduplicates and sorts collections alphabetically', async () => {
+    const saved = [
+      {
+        id: '2',
+        projectId: 'sorted-project',
+        authMethod: 'serviceAccount',
+        serviceAccountPath: '/sa.json',
+        collections: ['zebra', 'alpha', 'zebra', 'beta'],
+      },
+    ];
+    localStorage.setItem('firefoo-projects', JSON.stringify(saved));
+
+    const store = createTestStore({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await store.dispatch(loadProjects() as any);
+
+    const state = store.getState().projects;
+    const project = state.items[0] as Project;
+    expect(project.collections).toEqual([
+      { id: 'alpha', path: 'alpha' },
+      { id: 'beta', path: 'beta' },
+      { id: 'zebra', path: 'zebra' },
+    ]);
+  });
 });

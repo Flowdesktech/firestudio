@@ -74,16 +74,17 @@ const isProject = (item: Project | GoogleAccount): item is Project => {
 };
 
 const normalizeCollections = (collections?: Array<FirestoreCollection | string>) => {
-  if (!collections) return [];
-  return collections.map((collection) => {
-    if (typeof collection === 'string') {
-      return { id: collection, path: collection };
+  if (!collections || !Array.isArray(collections)) return [];
+  const map = new Map<string, FirestoreCollection>();
+  for (const collection of collections) {
+    if (!collection) continue;
+    const id = typeof collection === 'string' ? collection : collection.id;
+    const path = typeof collection === 'string' ? collection : collection.path || collection.id;
+    if (id && !map.has(id)) {
+      map.set(id, { id, path });
     }
-    return {
-      id: collection.id,
-      path: collection.path || collection.id,
-    };
-  });
+  }
+  return Array.from(map.values()).sort((a, b) => a.id.localeCompare(b.id));
 };
 
 const createAppAsyncThunk = createAsyncThunk.withTypes<{

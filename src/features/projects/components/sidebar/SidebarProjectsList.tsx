@@ -15,6 +15,7 @@ import {
   Add as AddIcon,
   Dns as DatabaseIcon,
   Computer as ComputerIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useDispatch } from 'react-redux';
 import { setSidebarItemExpanded, Tab } from '../../../../app/store/slices/uiSlice';
@@ -61,6 +62,8 @@ interface SidebarProjectsListProps {
   ) => void;
   isMenuOpen: boolean;
   menuTarget: MenuTarget | null;
+  onRefreshCollections?: (project: Project | GoogleAccount) => void;
+  onRefreshFirestoreDatabase?: (project: Project, firestoreDatabaseId: string) => void;
 }
 
 function SidebarProjectsList({
@@ -86,6 +89,8 @@ function SidebarProjectsList({
   handleContextMenu,
   isMenuOpen,
   menuTarget,
+  onRefreshCollections,
+  onRefreshFirestoreDatabase,
 }: SidebarProjectsListProps) {
   const dispatch = useDispatch();
 
@@ -524,6 +529,26 @@ function SidebarProjectsList({
                                                     {fd.databaseId}
                                                   </Typography>
                                                 </Box>
+                                                <Tooltip title="Refresh collections">
+                                                  <IconButton
+                                                    size="small"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (onRefreshFirestoreDatabase) {
+                                                        onRefreshFirestoreDatabase(project, fd.id);
+                                                      } else if (onRefreshCollections) {
+                                                        onRefreshCollections(project);
+                                                      }
+                                                    }}
+                                                    sx={{
+                                                      p: 0.2,
+                                                      color: 'text.secondary',
+                                                      '&:hover': { color: 'primary.main' },
+                                                    }}
+                                                  >
+                                                    <RefreshIcon sx={{ fontSize: 14 }} />
+                                                  </IconButton>
+                                                </Tooltip>
                                                 <IconButton
                                                   size="small"
                                                   onClick={(e) => {
@@ -1020,6 +1045,26 @@ function SidebarProjectsList({
                                             {fd.databaseId}
                                           </Typography>
                                         </Box>
+                                        <Tooltip title="Refresh collections">
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (onRefreshFirestoreDatabase) {
+                                                onRefreshFirestoreDatabase(project, fd.id);
+                                              } else if (onRefreshCollections) {
+                                                onRefreshCollections(project);
+                                              }
+                                            }}
+                                            sx={{
+                                              p: 0.2,
+                                              color: 'text.secondary',
+                                              '&:hover': { color: 'primary.main' },
+                                            }}
+                                          >
+                                            <RefreshIcon sx={{ fontSize: 14 }} />
+                                          </IconButton>
+                                        </Tooltip>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
@@ -1489,6 +1534,26 @@ function SidebarProjectsList({
                                             {fd.databaseId}
                                           </Typography>
                                         </Box>
+                                        <Tooltip title="Refresh collections">
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (onRefreshFirestoreDatabase) {
+                                                onRefreshFirestoreDatabase(project, fd.id);
+                                              } else if (onRefreshCollections) {
+                                                onRefreshCollections(project);
+                                              }
+                                            }}
+                                            sx={{
+                                              p: 0.2,
+                                              color: 'text.secondary',
+                                              '&:hover': { color: 'primary.main' },
+                                            }}
+                                          >
+                                            <RefreshIcon sx={{ fontSize: 14 }} />
+                                          </IconButton>
+                                        </Tooltip>
                                         <IconButton
                                           size="small"
                                           onClick={(e) => {
