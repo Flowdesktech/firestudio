@@ -46,7 +46,7 @@ const mockElectronAPI: ElectronAPI = {
   },
 
   // Query
-  query: async (_params: GetDocumentsParams) => {
+  query: async (_params: RunQueryParams) => {
     return { success: false, error: 'Requires Electron mode' };
   },
 

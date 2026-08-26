@@ -30,6 +30,7 @@ export {
 // Collection document utilities
 export {
   extractAllFields,
+  extractQueryableFields,
   filterDocumentsByConditions,
   filterDocumentsByText,
   sortDocuments,

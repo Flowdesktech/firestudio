@@ -55,6 +55,13 @@ interface GetDocumentsParams {
   orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
 }
 
+interface RunQueryParams {
+  collectionPath: string;
+  queries?: Array<{ field: string; operator: string; value: unknown }>;
+  orderBy?: { field: string; direction: 'asc' | 'desc' };
+  limit?: number;
+}
+
 interface CreateDocumentParams {
   collectionPath: string;
   documentId?: string;
@@ -258,7 +265,7 @@ interface ElectronAPI {
   deleteCollection: (collectionPath: string) => Promise<{ success: boolean; error?: string }>;
 
   // Query
-  query: (params: GetDocumentsParams) => Promise<{ success: boolean; documents?: FirestoreDocument[]; error?: string }>;
+  query: (params: RunQueryParams) => Promise<{ success: boolean; documents?: FirestoreDocument[]; error?: string }>;
 
   // Import/Export
   exportCollection: (collectionPath: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;

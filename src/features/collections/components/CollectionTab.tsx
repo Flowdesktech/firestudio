@@ -56,6 +56,7 @@ import {
   serializeForEdit,
   normalizeEditedValue,
   extractAllFields,
+  extractQueryableFields,
   processDocuments,
   getVisibleFields,
   documentsToJson,
@@ -420,6 +421,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
 
   // Computed values
   const allFields = useMemo(() => extractAllFields(documents), [documents]);
+  const queryFields = useMemo(() => extractQueryableFields(documents), [documents]);
 
   const visibleFields = useMemo(() => getVisibleFields(allFields, hiddenColumns), [allFields, hiddenColumns]);
 
@@ -696,7 +698,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
           setJsQuery={setJsQuery}
           projectId={project?.projectId}
           collectionPath={collectionPath}
-          fieldNames={allFields}
+          fieldNames={queryFields}
         />
       )}
 
@@ -731,8 +733,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
           setFilters={setFilters}
           sortConfig={sortConfig}
           setSortConfig={setSortConfig}
-          allFields={allFields}
-          onApply={executeJsQuery}
+          allFields={queryFields}
+          onApply={loadDocuments}
         />
       )}
 
