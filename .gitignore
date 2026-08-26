@@ -42,3 +42,7 @@ temp/
 
 # Bun lock files for developers using bun instead of pnpm
 bun.lock
+
+.atl
+.opencode
+.codegraph

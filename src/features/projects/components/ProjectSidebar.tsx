@@ -272,6 +272,8 @@ function ProjectSidebar({
         handleContextMenu={handleContextMenu}
         isMenuOpen={isMenuOpen}
         menuTarget={menuTarget}
+        onRefreshCollections={onRefreshCollections}
+        onRefreshFirestoreDatabase={onRefreshFirestoreDatabase}
       />
 
       {/* Bottom Toolbar */}

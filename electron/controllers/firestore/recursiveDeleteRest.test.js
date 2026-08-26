@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRequire } from 'module';
 
 const require_ = createRequire(import.meta.url);
-const { deleteDocumentTree } = require_('./recursiveDeleteRest');
+const { deleteDocumentTree, listCollectionIds } = require_('./recursiveDeleteRest');
 
 const URL_ROOT = 'https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents';
 const NAME_ROOT = 'projects/p/databases/(default)/documents';
@@ -69,5 +69,56 @@ describe('deleteDocumentTree', () => {
       message: 'Unauthenticated',
       ipcResult: { success: false, error: 'Unauthenticated', requiresReauth: true },
     });
+  });
+});
+
+describe('listCollectionIds', () => {
+  it('fetches root collections across multiple pages with pagination tokens', async () => {
+    const authenticatedFetch = vi.fn(async (url, options) => {
+      expect(url).toBe(`${URL_ROOT}:listCollectionIds`);
+      const body = JSON.parse(options.body);
+      expect(body.pageSize).toBe(300);
+
+      if (!body.pageToken) {
+        return {
+          ok: true,
+          data: {
+            collectionIds: ['users', 'products'],
+            nextPageToken: 'page-2-token',
+          },
+        };
+      }
+      if (body.pageToken === 'page-2-token') {
+        return {
+          ok: true,
+          data: {
+            collectionIds: ['orders', 'settings'],
+          },
+        };
+      }
+      return { ok: true, data: { collectionIds: [] } };
+    });
+
+    const result = await listCollectionIds({ authenticatedFetch, urlRoot: URL_ROOT });
+    expect(result).toEqual(['users', 'products', 'orders', 'settings']);
+    expect(authenticatedFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('fetches subcollections for a specified document path', async () => {
+    const authenticatedFetch = vi.fn(async (url, options) => {
+      expect(url).toBe(`${URL_ROOT}/users/u1:listCollectionIds`);
+      const body = JSON.parse(options.body);
+      expect(body.pageSize).toBe(300);
+      return {
+        ok: true,
+        data: {
+          collectionIds: ['messages', 'notifications'],
+        },
+      };
+    });
+
+    const result = await listCollectionIds({ authenticatedFetch, urlRoot: URL_ROOT }, 'users/u1');
+    expect(result).toEqual(['messages', 'notifications']);
+    expect(authenticatedFetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -33,12 +33,11 @@ function relativeDocPath(resourceName) {
 async function listCollectionIds({ authenticatedFetch, urlRoot }, docPath) {
   const ids = [];
   let pageToken;
+  const url = docPath ? `${urlRoot}/${docPath}:listCollectionIds` : `${urlRoot}:listCollectionIds`;
   do {
-    const data = await postJson(
-      authenticatedFetch,
-      `${urlRoot}/${docPath}:listCollectionIds`,
-      pageToken ? { pageToken } : {},
-    );
+    const body = { pageSize: 300 };
+    if (pageToken) body.pageToken = pageToken;
+    const data = await postJson(authenticatedFetch, url, body);
     ids.push(...(data.collectionIds || []));
     pageToken = data.nextPageToken;
   } while (pageToken);
