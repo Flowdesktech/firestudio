@@ -75,6 +75,7 @@
     "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
     "@reduxjs/toolkit": "^2.11.2",
+    "dompurify": "^3.4.14",
     "dotenv": "^16.3.1",
     "electron-is-dev": "^3.0.1",
     "electron-updater": "^6.8.3",

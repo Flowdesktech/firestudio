@@ -13,6 +13,10 @@ ipcRenderer.on('scan-emulators', () => {
   window.dispatchEvent(new CustomEvent('scan-emulators'));
 });
 
+ipcRenderer.on('auto-update:state', (_event, state) => {
+  window.dispatchEvent(new CustomEvent('auto-update-state', { detail: state }));
+});
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -111,4 +115,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Shell - open external URLs in default browser
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+
+  // Auto-update
+  getAutoUpdateState: () => ipcRenderer.invoke('auto-update:getState'),
+  downloadUpdate: () => ipcRenderer.invoke('auto-update:download'),
+  installUpdate: () => ipcRenderer.invoke('auto-update:install'),
 });

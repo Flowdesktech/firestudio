@@ -207,6 +207,32 @@ interface EmulatorConfigResult {
   error?: string;
 }
 
+type AutoUpdateStatus = 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+
+interface AutoUpdateProgress {
+  percent: number;
+  bytesPerSecond?: number;
+  transferred?: number;
+  total?: number;
+}
+
+interface AutoUpdateState {
+  status: AutoUpdateStatus;
+  currentVersion: string;
+  version?: string;
+  releaseName?: string;
+  /** Sanitized in the renderer before being inserted as HTML. */
+  releaseNotes?: string;
+  releaseDate?: string;
+  progress?: AutoUpdateProgress;
+  error?: string;
+}
+
+interface AutoUpdateActionResult {
+  success: boolean;
+  error?: string;
+}
+
 interface ElectronAPI {
   // Firebase
   connectFirebase: (params: ConnectFirebaseParams) => Promise<ConnectFirebaseResult>;
@@ -336,6 +362,11 @@ interface ElectronAPI {
   openExternal: (url: string) => Promise<void>;
   selectFile: (options: SelectFileOptions) => Promise<{ canceled: boolean; filePaths: string[] }>;
   setNativeTheme: (theme: 'system' | 'light' | 'dark') => void;
+
+  // Auto-update
+  getAutoUpdateState: () => Promise<AutoUpdateState>;
+  downloadUpdate: () => Promise<AutoUpdateActionResult>;
+  installUpdate: () => Promise<AutoUpdateActionResult>;
 
   // Export
   exportCollections: () => Promise<{
