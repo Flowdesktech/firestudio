@@ -165,13 +165,16 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "executableName": "Firestudio"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
+      "shortcutName": "Firestudio",
+      "uninstallDisplayName": "Firestudio",
       "artifactName": "${productName}-${version}-Windows-Setup-${arch}.${ext}"
     },
     "portable": {
