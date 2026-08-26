@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm run dev:vite\" \"pnpm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development NODE_OPTIONS=--disable-warning=DEP0040 electron .",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --report-unused-disable-directives --max-warnings 0",
@@ -29,7 +29,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "preview": "vite preview",
-    "prepare": "husky install",
+    "prepare": "husky",
     "postinstall": "node scripts/ensure-electron.js"
   },
   "keywords": [
@@ -70,53 +70,54 @@
   "license": "MIT",
   "packageManager": "pnpm@10.15.1",
   "dependencies": {
-    "@emotion/react": "^11.11.0",
-    "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.15.0",
-    "@mui/material": "^5.15.0",
-    "@reduxjs/toolkit": "^2.11.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^5.18.0",
+    "@mui/material": "^5.18.0",
+    "@reduxjs/toolkit": "^2.12.0",
     "dompurify": "^3.4.14",
-    "dotenv": "^16.3.1",
+    "dotenv": "^16.6.1",
     "electron-is-dev": "^3.0.1",
-    "electron-updater": "^6.8.3",
-    "firebase-admin": "^12.0.0",
-    "highlight.js": "^11.11.1",
+    "electron-updater": "^6.8.9",
+    "firebase-admin": "^14.3.0",
+    "highlight.js": "^11.12.0",
     "mime-types": "^2.1.35",
     "node-fetch": "^2.7.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-redux": "^9.2.0",
-    "sweetalert2": "^11.26.17"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-redux": "^9.3.0",
+    "sweetalert2": "^11.26.25"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@types/node": "^25.2.2",
-    "@types/react": "^19.2.13",
-    "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.55.0",
-    "@typescript-eslint/parser": "^8.55.0",
-    "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.0.18",
-    "concurrently": "^8.2.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.5",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@typescript-eslint/eslint-plugin": "^8.68.0",
+    "@typescript-eslint/parser": "^8.68.0",
+    "@vitejs/plugin-react": "^6.1.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "browserslist": "^4.28.8",
+    "caniuse-lite": "^1.0.30001810",
+    "concurrently": "^10.0.5",
     "cross-env": "^7.0.3",
-    "electron": "^35.7.5",
-    "electron-builder": "^24.9.0",
-    "eslint": "^9.39.2",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.5.0",
-    "globals": "^17.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
     "husky": "^9.1.7",
-    "jsdom": "^28.1.0",
-    "lint-staged": "^16.2.7",
-    "png-to-ico": "^3.0.1",
-    "prettier": "^3.8.1",
-    "sharp": "^0.34.5",
+    "jsdom": "^30.0.1",
+    "lint-staged": "^17.3.0",
+    "png-to-ico": "^3.0.2",
+    "prettier": "^3.9.6",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.3",
-    "vite": "^6.4.1",
-    "vitest": "^4.0.18",
-    "wait-on": "^7.2.0"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
+    "wait-on": "^9.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -164,8 +165,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.ico",
-      "signAndEditExecutable": false
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -227,18 +227,6 @@
       "provider": "github",
       "owner": "Flowdesktech",
       "repo": "firestudio"
-    }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild",
-      "sharp",
-      "protobufjs"
-    ],
-    "overrides": {
-      "axios": ">=1.13.5",
-      "tar": ">=7.5.7"
     }
   }
 }

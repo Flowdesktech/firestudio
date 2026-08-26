@@ -460,7 +460,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       !isCollectionFavorite ? `Added ${collectionPath} to favorites` : `Removed ${collectionPath} from favorites`,
       'info',
     );
-  }, [dispatch, project?.projectId, collectionPath, showMessage, isCollectionFavorite]);
+  }, [dispatch, project.projectId, collectionPath, showMessage, isCollectionFavorite]);
 
   const toggleNode = useCallback((path: string) => {
     setExpandedNodes((prev) => ({ ...prev, [path]: !prev[path] }));

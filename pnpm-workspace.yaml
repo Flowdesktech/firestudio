@@ -1,1 +1,28 @@
-onlyBuiltDependencies: electron,esbuild,sharp,protobufjs
+packages:
+  - .
+
+nodeLinker: hoisted
+
+onlyBuiltDependencies:
+  - '@firebase/util'
+  - electron
+  - electron-winstaller
+  - esbuild
+  - sharp
+  - protobufjs
+
+# Deprecated transitive packages still required by the latest Firebase/Electron
+# tooling. Keep these pinned and visible here until their upstreams replace them.
+allowedDeprecatedVersions:
+  boolean: 3.2.0
+  glob: '>=7.2.3 <=10.5.0'
+  inflight: 1.0.6
+  lodash.isequal: 4.5.0
+  node-domexception: 1.0.0
+  rimraf: 2.6.3
+
+# @google-cloud/storage 7.22 still pulls gaxios 6 -> uuid 9.0.1.
+# The direct Firebase Admin dependency is already current, so this is the only
+# transitive security override that cannot be fixed by updating a root package.
+overrides:
+  uuid@9.0.1: 14.0.2
