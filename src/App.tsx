@@ -660,6 +660,9 @@ function FirestudioApp() {
                   collectionPath={activeTab.collectionPath}
                   firestoreDatabaseId={activeTab.firestoreDatabaseId}
                   showMessage={(msg: string, type: MessageType) => dispatch(addLog({ type, message: msg }))}
+                  onOpenCollection={(collectionPath: string, firestoreDatabaseId?: string) =>
+                    onOpenCollection(project, collectionPath, firestoreDatabaseId, activeTab.databaseLabel)
+                  }
                 />
               );
             }

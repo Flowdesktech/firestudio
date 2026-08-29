@@ -16,8 +16,11 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  IconButton,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
-import { Storage as CollectionIcon } from '@mui/icons-material';
+import { ArrowForward as OpenCollectionIcon, Storage as CollectionIcon } from '@mui/icons-material';
 
 // Context
 import { useSelector, useDispatch } from 'react-redux';
@@ -93,12 +96,19 @@ interface CollectionTabProps {
   /** Service account: FirestoreDatabase.id for this tab */
   firestoreDatabaseId?: string;
   showMessage?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  onOpenCollection?: (collectionPath: string, firestoreDatabaseId?: string) => void;
 }
 
 /**
  * CollectionTab - Main component for Firestore collection management
  */
-const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, firestoreDatabaseId, showMessage }) => {
+const CollectionTab: React.FC<CollectionTabProps> = ({
+  project,
+  collectionPath,
+  firestoreDatabaseId,
+  showMessage,
+  onOpenCollection,
+}) => {
   // Theme
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
@@ -382,6 +392,11 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [collectionPathInput, setCollectionPathInput] = useState(collectionPath);
+
+  useEffect(() => {
+    setCollectionPathInput(collectionPath);
+  }, [collectionPath]);
 
   // Nested subcollection data (shared with the tree view so saves can refresh it)
   const { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments, refreshDocuments } =
@@ -444,6 +459,22 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
       await executeJsQuery();
     }
   }, [queryMode, loadDocuments, executeJsQuery]);
+
+  const handleOpenCollectionPath = useCallback(() => {
+    const nextPath = collectionPathInput.trim().replace(/^\/+|\/+$/g, '');
+    const segments = nextPath.split('/');
+
+    if (!nextPath || segments.some((segment) => !segment) || segments.length % 2 === 0) {
+      showMessage?.(
+        'Enter a collection path with an odd number of segments, for example users or users/user-id/posts.',
+        'error',
+      );
+      return;
+    }
+
+    if (nextPath === collectionPath) return;
+    onOpenCollection?.(nextPath, firestoreDatabaseId);
+  }, [collectionPathInput, collectionPath, firestoreDatabaseId, onOpenCollection, showMessage]);
 
   const handleToggleFavorite = useCallback(() => {
     dispatch(
@@ -714,7 +745,41 @@ const CollectionTab: React.FC<CollectionTabProps> = ({ project, collectionPath, 
         }}
       >
         <CollectionIcon sx={{ fontSize: 16, color: 'text.secondary', ml: 1 }} />
-        <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{collectionPath}</Typography>
+        {queryMode === 'simple' ? (
+          <TextField
+            size="small"
+            value={collectionPathInput}
+            onChange={(event) => setCollectionPathInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                handleOpenCollectionPath();
+              }
+            }}
+            placeholder="Collection path"
+            aria-label="Collection path"
+            sx={{ minWidth: 280 }}
+            InputProps={{
+              sx: { fontSize: '0.8rem', height: 30 },
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title="Open collection path">
+                    <IconButton
+                      size="small"
+                      onClick={handleOpenCollectionPath}
+                      edge="end"
+                      aria-label="Open collection path"
+                    >
+                      <OpenCollectionIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
+          />
+        ) : (
+          <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{collectionPath}</Typography>
+        )}
         <Box sx={{ flexGrow: 1 }} />
         <TextField
           size="small"
