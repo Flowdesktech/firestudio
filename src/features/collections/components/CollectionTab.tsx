@@ -93,6 +93,8 @@ interface CollectionTabProps {
   collectionPath: string;
   /** Service account: FirestoreDatabase.id for this tab */
   firestoreDatabaseId?: string;
+  /** When set, renders only this document while retaining the parent collection layout. */
+  documentPath?: string;
   showMessage?: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
   onOpenCollection?: (collectionPath: string, firestoreDatabaseId?: string) => void;
 }
@@ -104,6 +106,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   project,
   collectionPath,
   firestoreDatabaseId,
+  documentPath,
   showMessage,
   onOpenCollection,
 }) => {
@@ -122,7 +125,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   );
 
   // Collection Data (Redux)
-  const collectionKey = buildCollectionStateKey(project, collectionPath, firestoreDatabaseId);
+  const collectionKey = buildCollectionStateKey(project, documentPath || collectionPath, firestoreDatabaseId);
   const collectionData = useSelector((state: RootState) => selectCollectionData(state, collectionKey));
   const {
     documents = [],
@@ -173,7 +176,13 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
       initialFetchRef.current.inFlight = true;
       try {
         await dispatch(
-          fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+          fetchDocuments({
+            project,
+            collection: collectionPath,
+            key: collectionKey,
+            firestoreDatabaseId,
+            documentPath,
+          }),
         ).unwrap();
         initialFetchRef.current.done = true;
       } catch (error: unknown) {
@@ -196,6 +205,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     showError,
     collectionData?.lastFetchedAt,
     firestoreDatabaseId,
+    documentPath,
   ]);
 
   // Wrapped Setters
@@ -250,23 +260,23 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   const loadDocuments = useCallback(async () => {
     try {
       await dispatch(
-        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId, documentPath }),
       ).unwrap();
     } catch (error) {
       showError(error);
     }
-  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, showError]);
+  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, documentPath, showError]);
 
   // Execute JS Query (Same thunk, just ensures state is ready)
   const executeJsQuery = useCallback(async () => {
     try {
       await dispatch(
-        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId }),
+        fetchDocuments({ project, collection: collectionPath, key: collectionKey, firestoreDatabaseId, documentPath }),
       ).unwrap();
     } catch (error) {
       showError(error);
     }
-  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, showError]);
+  }, [dispatch, project, collectionPath, collectionKey, firestoreDatabaseId, documentPath, showError]);
 
   // Import/Export Wrappers
   const saveDocumentsFromJson = useCallback(
@@ -390,11 +400,11 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [collectionPathInput, setCollectionPathInput] = useState(collectionPath);
+  const [collectionPathInput, setCollectionPathInput] = useState(documentPath || collectionPath);
 
   useEffect(() => {
-    setCollectionPathInput(collectionPath);
-  }, [collectionPath]);
+    setCollectionPathInput(documentPath || collectionPath);
+  }, [collectionPath, documentPath]);
 
   // Nested subcollection data (shared with the tree view so saves can refresh it)
   const { subcollectionsByDocPath, documentsByPath, ensureSubcollections, ensureDocuments, refreshDocuments } =
@@ -462,17 +472,14 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     const nextPath = collectionPathInput.trim().replace(/^\/+|\/+$/g, '');
     const segments = nextPath.split('/');
 
-    if (!nextPath || segments.some((segment) => !segment) || segments.length % 2 === 0) {
-      showMessage?.(
-        'Enter a collection path with an odd number of segments, for example users or users/user-id/posts.',
-        'error',
-      );
+    if (!nextPath || segments.some((segment) => !segment)) {
+      showMessage?.('Enter a valid Firestore collection or document path.', 'error');
       return;
     }
 
-    if (nextPath === collectionPath) return;
+    if (nextPath === (documentPath || collectionPath)) return;
     onOpenCollection?.(nextPath, firestoreDatabaseId);
-  }, [collectionPathInput, collectionPath, firestoreDatabaseId, onOpenCollection, showMessage]);
+  }, [collectionPathInput, collectionPath, documentPath, firestoreDatabaseId, onOpenCollection, showMessage]);
 
   const handleToggleFavorite = useCallback(() => {
     dispatch(

@@ -159,18 +159,19 @@ function FirestudioApp() {
   // Tab Handlers
   const onOpenCollection = (
     project: Project | GoogleAccount,
-    collectionPath: string,
+    path: string,
     firestoreDatabaseId?: string,
     databaseLabel?: string,
   ) => {
     if (isGoogleAccount(project)) return;
-    const id = firestoreDatabaseId
-      ? `${project.id}-${firestoreDatabaseId}-${collectionPath}`
-      : `${project.id}-${collectionPath}`;
+    const segments = path.split('/');
+    const docPath = segments.length % 2 === 0 ? path : undefined;
+    const collectionPath = docPath ? segments.slice(0, -1).join('/') : path;
+    const id = firestoreDatabaseId ? `${project.id}-${firestoreDatabaseId}-${path}` : `${project.id}-${path}`;
     const label =
       databaseLabel && !isGoogleAccount(project) && project.authMethod === 'serviceAccount'
-        ? `${databaseLabel} · ${collectionPath}`
-        : collectionPath;
+        ? `${databaseLabel} · ${path}`
+        : path;
     dispatch(
       addTab({
         id,
@@ -179,6 +180,7 @@ function FirestudioApp() {
         label,
         type: 'collection',
         collectionPath,
+        docPath,
         firestoreDatabaseId,
         databaseLabel,
       }),
@@ -659,6 +661,7 @@ function FirestudioApp() {
                   project={project}
                   collectionPath={activeTab.collectionPath}
                   firestoreDatabaseId={activeTab.firestoreDatabaseId}
+                  documentPath={activeTab.docPath || undefined}
                   showMessage={(msg: string, type: MessageType) => dispatch(addLog({ type, message: msg }))}
                   onOpenCollection={(collectionPath: string, firestoreDatabaseId?: string) =>
                     onOpenCollection(project, collectionPath, firestoreDatabaseId, activeTab.databaseLabel)

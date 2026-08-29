@@ -182,10 +182,7 @@ function parseSimpleFilterValue(value: FirestoreValue): FirestoreValue {
   if (trimmed === 'null') return null;
   if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
 
-  if (
-    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
-    (trimmed.startsWith('{') && trimmed.endsWith('}'))
-  ) {
+  if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
     try {
       return JSON.parse(trimmed) as FirestoreValue;
     } catch {
@@ -198,10 +195,10 @@ function parseSimpleFilterValue(value: FirestoreValue): FirestoreValue {
 
 export const fetchDocuments = createAppAsyncThunk<
   { documents: Document[] },
-  { project: Project; collection: string; key: string; firestoreDatabaseId?: string }
+  { project: Project; collection: string; key: string; firestoreDatabaseId?: string; documentPath?: string }
 >(
   'collection/fetchDocuments',
-  async ({ project, collection, key, firestoreDatabaseId }, { rejectWithValue, getState, extra }) => {
+  async ({ project, collection, key, firestoreDatabaseId, documentPath }, { rejectWithValue, getState, extra }) => {
     const electron = extra.electron.api;
     try {
       const state = getState().collection.cache[key];
@@ -212,7 +209,23 @@ export const fetchDocuments = createAppAsyncThunk<
       let documents: Document[] = [];
       const parsedLimit = typeof limit === 'number' ? limit : parseInt(String(limit), 10) || 50;
 
-      if (queryMode === 'js' && jsQuery) {
+      if (documentPath) {
+        if (project.authMethod === 'google') {
+          const result = await electron.googleGetDocument({
+            projectId: project.projectId,
+            documentPath,
+            databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
+          });
+          if (!result.success || !result.document) throw new Error(result.error || 'Document not found');
+          documents = [result.document as unknown as Document];
+        } else {
+          await connectForProject(electron, project, firestoreDatabaseId);
+          const result = await electron.getDocument(documentPath);
+          const document = (result as unknown as { document?: Document }).document;
+          if (!result.success || !document) throw new Error(result.error || 'Document not found');
+          documents = [document];
+        }
+      } else if (queryMode === 'js' && jsQuery) {
         // JS Query Mode
         if (project.authMethod === 'google') {
           // Google JS Query logic
