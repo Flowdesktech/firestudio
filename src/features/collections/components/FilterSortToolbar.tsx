@@ -1,14 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import {
-  Autocomplete,
-  Box,
-  Button,
-  IconButton,
-  MenuItem,
-  Select,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Autocomplete, Box, Button, IconButton, MenuItem, Select, TextField, Typography } from '@mui/material';
 import { FilterList as FilterIcon, Sort as SortIcon } from '@mui/icons-material';
 import { Filter, SortConfig } from '../store/collectionSlice';
 

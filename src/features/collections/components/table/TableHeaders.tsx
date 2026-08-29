@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTheme } from '@mui/material';
 import { TableThemeColors } from '../../../../app/theme';
+import { singleLineTruncation } from '../../../../shared/ui/textStyles';
 
 interface TableHeadersProps {
   visibleFields: string[];
@@ -73,9 +74,7 @@ const TableHeaders: React.FC<TableHeadersProps> = ({
           fontStyle: 'italic',
           borderBottom: cellBorder,
           borderRight: cellBorder,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          ...singleLineTruncation,
           zIndex: 10,
         }}
       >
@@ -115,9 +114,7 @@ const TableHeaders: React.FC<TableHeadersProps> = ({
             color: tableColors.headerText,
             borderBottom: cellBorder,
             borderRight: cellBorder,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            ...singleLineTruncation,
             zIndex: 10,
           }}
         >

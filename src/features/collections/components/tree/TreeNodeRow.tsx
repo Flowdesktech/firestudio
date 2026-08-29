@@ -14,6 +14,7 @@ import {
 } from '../../../../shared/utils/dateUtils';
 import { DocumentData } from '../../store/collectionSlice';
 import { TreeContext } from './TreeContext';
+import { singleLineTruncation } from '../../../../shared/ui/textStyles';
 
 interface TreeNodeRowProps {
   nodeKey: string;
@@ -123,8 +124,10 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
             {isCollection && <CollectionIcon sx={{ fontSize: 14, color: '#1976d2', mr: 0.5 }} />}
             {isDoc && <DocumentIcon sx={{ fontSize: 14, color: '#ff9800', mr: 0.5 }} />}
             <Typography
-              title={missing ? 'Document has no fields; it exists as a parent of subcollections' : undefined}
+              title={missing ? 'Document has no fields; it exists as a parent of subcollections' : nodeKey}
               sx={{
+                ...singleLineTruncation,
+                flex: 1,
                 fontSize: '0.8rem',
                 color: missing ? 'text.disabled' : 'text.primary',
                 fontStyle: missing ? 'italic' : 'normal',
@@ -177,8 +180,10 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
               )
             ) : (
               <Typography
+                title={displayValue}
                 onClick={() => docId && onCellEdit(docId, nodeKey, value, docData, docCollectionPath)}
                 sx={{
+                  ...singleLineTruncation,
                   fontSize: '0.8rem',
                   color: getTypeColor(nodeType, isDark),
                   cursor: 'pointer',
@@ -190,11 +195,21 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
               </Typography>
             )
           ) : (
-            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{displayValue}</Typography>
+            <Typography
+              title={displayValue}
+              sx={{ ...singleLineTruncation, fontSize: '0.8rem', color: 'text.primary' }}
+            >
+              {displayValue}
+            </Typography>
           )}
         </TableCell>
         <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography sx={{ fontSize: '0.75rem', color: getTypeColor(nodeType, isDark) }}>{nodeType}</Typography>
+          <Typography
+            title={nodeType}
+            sx={{ ...singleLineTruncation, fontSize: '0.75rem', color: getTypeColor(nodeType, isDark) }}
+          >
+            {nodeType}
+          </Typography>
         </TableCell>
       </TableRow>
 

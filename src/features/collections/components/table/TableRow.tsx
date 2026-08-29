@@ -5,6 +5,7 @@ import CellRenderer from './CellRenderer';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
 import { Document } from '../../store/collectionSlice';
 import { TableThemeColors } from '../../../../app/theme';
+import { singleLineTruncation } from '../../../../shared/ui/textStyles';
 
 interface TableRowProps {
   doc: Document; // Firestore document with id and data
@@ -116,9 +117,7 @@ const TableRow: React.FC<TableRowProps> = ({
           fontSize: '0.75rem',
           borderBottom: cellBorder,
           borderRight: cellBorder,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          ...singleLineTruncation,
           backgroundColor: rowBg,
           transition: 'background-color 0.1s ease',
         }}

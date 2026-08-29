@@ -177,14 +177,21 @@ const TreeView: React.FC<TreeViewProps> = ({
               Key
               <Box
                 onMouseDown={(event) => handleResizeStart(event, 0)}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.background = theme.palette.primary.main + '40';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.background = 'transparent';
+                }}
                 sx={{
                   position: 'absolute',
                   top: 0,
-                  right: -5,
-                  width: 10,
-                  height: '100%',
+                  right: 0,
+                  bottom: 0,
+                  width: 6,
                   cursor: 'col-resize',
-                  zIndex: 1,
+                  zIndex: 20,
+                  bgcolor: 'transparent',
                 }}
               />
             </TableCell>
@@ -201,14 +208,21 @@ const TreeView: React.FC<TreeViewProps> = ({
               Value
               <Box
                 onMouseDown={(event) => handleResizeStart(event, 1)}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.background = theme.palette.primary.main + '40';
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.background = 'transparent';
+                }}
                 sx={{
                   position: 'absolute',
                   top: 0,
-                  right: -5,
-                  width: 10,
-                  height: '100%',
+                  right: 0,
+                  bottom: 0,
+                  width: 6,
                   cursor: 'col-resize',
-                  zIndex: 1,
+                  zIndex: 20,
+                  bgcolor: 'transparent',
                 }}
               />
             </TableCell>

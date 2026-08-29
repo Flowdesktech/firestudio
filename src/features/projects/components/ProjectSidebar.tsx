@@ -148,9 +148,7 @@ function ProjectSidebar({
   const handleContextMenu = (
     e: React.MouseEvent,
     target:
-      | MenuTarget
-      | Project
-      | { project: Project | GoogleAccount; collection: string; firestoreDatabaseId?: string },
+      MenuTarget | Project | { project: Project | GoogleAccount; collection: string; firestoreDatabaseId?: string },
     type: Exclude<MenuTargetType, 'account'>,
   ) => {
     e.preventDefault();
