@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme } from '@mui/material';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, useTheme } from '@mui/material';
 import { FirestoreValue } from '../../../shared/utils/firestoreUtils';
 import { Document, DocumentData } from '../store/collectionSlice';
 import TreeNodeRow from './tree/TreeNodeRow';
@@ -54,6 +54,60 @@ const TreeView: React.FC<TreeViewProps> = ({
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const tableRef = useRef<HTMLTableElement>(null);
+  const resizeRef = useRef<{ index: number; startX: number; widths: number[] } | null>(null);
+  const [columnWidths, setColumnWidths] = useState<number[] | null>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const resize = resizeRef.current;
+      if (!resize) return;
+
+      const minimumWidths = [180, 180, 100];
+      const nextWidths = [...resize.widths];
+      const leftIndex = resize.index;
+      const rightIndex = leftIndex + 1;
+      const totalWidth = resize.widths[leftIndex] + resize.widths[rightIndex];
+      const desiredLeftWidth = resize.widths[leftIndex] + event.clientX - resize.startX;
+      const leftWidth = Math.max(
+        minimumWidths[leftIndex],
+        Math.min(desiredLeftWidth, totalWidth - minimumWidths[rightIndex]),
+      );
+
+      nextWidths[leftIndex] = leftWidth;
+      nextWidths[rightIndex] = totalWidth - leftWidth;
+      setColumnWidths(nextWidths);
+    };
+
+    const handleMouseUp = () => {
+      if (!resizeRef.current) return;
+      resizeRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeStart = (event: React.MouseEvent, index: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const headerCells = tableRef.current?.querySelectorAll('thead th');
+    if (!headerCells || headerCells.length !== 3) return;
+
+    resizeRef.current = {
+      index,
+      startX: event.clientX,
+      widths: Array.from(headerCells, (cell) => cell.getBoundingClientRect().width),
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   const contextValue = useMemo<TreeContextValue>(
     () => ({
@@ -102,18 +156,63 @@ const TreeView: React.FC<TreeViewProps> = ({
 
   return (
     <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
-      <Table size="small" stickyHeader>
+      <Table ref={tableRef} size="small" stickyHeader sx={{ tableLayout: 'fixed', minWidth: 600 }}>
+        <colgroup>
+          <col style={{ width: columnWidths ? `${columnWidths[0]}px` : '40%' }} />
+          <col style={{ width: columnWidths ? `${columnWidths[1]}px` : '40%' }} />
+          <col style={{ width: columnWidths ? `${columnWidths[2]}px` : '20%' }} />
+        </colgroup>
         <TableHead>
           <TableRow>
-            <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '40%', color: 'text.primary' }}>
+            <TableCell
+              sx={{
+                fontWeight: 600,
+                bgcolor: 'background.default',
+                color: 'text.primary',
+                borderRight: 1,
+                borderColor: 'divider',
+                position: 'relative',
+              }}
+            >
               Key
+              <Box
+                onMouseDown={(event) => handleResizeStart(event, 0)}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  right: -5,
+                  width: 10,
+                  height: '100%',
+                  cursor: 'col-resize',
+                  zIndex: 1,
+                }}
+              />
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '40%', color: 'text.primary' }}>
+            <TableCell
+              sx={{
+                fontWeight: 600,
+                bgcolor: 'background.default',
+                color: 'text.primary',
+                borderRight: 1,
+                borderColor: 'divider',
+                position: 'relative',
+              }}
+            >
               Value
+              <Box
+                onMouseDown={(event) => handleResizeStart(event, 1)}
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  right: -5,
+                  width: 10,
+                  height: '100%',
+                  cursor: 'col-resize',
+                  zIndex: 1,
+                }}
+              />
             </TableCell>
-            <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', width: '20%', color: 'text.primary' }}>
-              Type
-            </TableCell>
+            <TableCell sx={{ fontWeight: 600, bgcolor: 'background.default', color: 'text.primary' }}>Type</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>

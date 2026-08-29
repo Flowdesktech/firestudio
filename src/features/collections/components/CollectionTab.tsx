@@ -16,11 +16,9 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-  IconButton,
   InputAdornment,
-  Tooltip,
 } from '@mui/material';
-import { ArrowForward as OpenCollectionIcon, Storage as CollectionIcon } from '@mui/icons-material';
+import { Storage as CollectionIcon } from '@mui/icons-material';
 
 // Context
 import { useSelector, useDispatch } from 'react-redux';
@@ -744,7 +742,6 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
           gap: 1,
         }}
       >
-        <CollectionIcon sx={{ fontSize: 16, color: 'text.secondary', ml: 1 }} />
         {queryMode === 'simple' ? (
           <TextField
             size="small"
@@ -758,29 +755,22 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
             }}
             placeholder="Collection path"
             aria-label="Collection path"
-            sx={{ minWidth: 280 }}
+            sx={{ flexGrow: 1 }}
             InputProps={{
               sx: { fontSize: '0.8rem', height: 30 },
-              endAdornment: (
-                <InputAdornment position="end">
-                  <Tooltip title="Open collection path">
-                    <IconButton
-                      size="small"
-                      onClick={handleOpenCollectionPath}
-                      edge="end"
-                      aria-label="Open collection path"
-                    >
-                      <OpenCollectionIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+              startAdornment: (
+                <InputAdornment position="start">
+                  <CollectionIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                 </InputAdornment>
               ),
             }}
           />
         ) : (
-          <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{collectionPath}</Typography>
+          <>
+            <CollectionIcon sx={{ fontSize: 16, color: 'text.secondary', ml: 1 }} />
+            <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{collectionPath}</Typography>
+          </>
         )}
-        <Box sx={{ flexGrow: 1 }} />
         <TextField
           size="small"
           placeholder="Search"

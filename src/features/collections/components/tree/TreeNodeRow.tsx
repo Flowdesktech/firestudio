@@ -105,10 +105,10 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
             py: 0.25,
             pl: depth * 2 + 1,
             borderBottom: 1,
+            borderRight: 1,
             borderColor: 'divider',
             cursor: isExpandable ? 'pointer' : 'default',
             color: 'text.primary',
-            width: '40%',
           }}
           onClick={() => isExpandable && toggleNode(path)}
         >
@@ -134,7 +134,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
             </Typography>
           </Box>
         </TableCell>
-        <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider', width: '40%' }}>
+        <TableCell sx={{ py: 0.25, borderBottom: 1, borderRight: 1, borderColor: 'divider' }}>
           {!isCollection && !isDoc && !isExpandable ? (
             isEditing ? (
               isDateLike ? (
@@ -193,7 +193,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
             <Typography sx={{ fontSize: '0.8rem', color: 'text.primary' }}>{displayValue}</Typography>
           )}
         </TableCell>
-        <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider', width: '20%' }}>
+        <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
           <Typography sx={{ fontSize: '0.75rem', color: getTypeColor(nodeType, isDark) }}>{nodeType}</Typography>
         </TableCell>
       </TableRow>
