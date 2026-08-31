@@ -55,6 +55,39 @@ export const extractAllFields = (documents: Document[]): string[] => {
 };
 
 /**
+ * Extracts Firestore field paths for query autocomplete, including nested map
+ * fields in dot notation (for example, "profile.displayName").
+ */
+export const extractQueryableFields = (documents: Document[]): string[] => {
+  const fields = new Set<string>();
+
+  const visitMap = (value: Record<string, FirestoreValue>, prefix = '', depth = 0) => {
+    if (depth > 10) return;
+
+    Object.entries(value).forEach(([key, childValue]) => {
+      const fieldPath = prefix ? `${prefix}.${key}` : key;
+      fields.add(fieldPath);
+
+      const isSpecialFirestoreValue =
+        childValue instanceof Date ||
+        (typeof childValue === 'object' &&
+          childValue !== null &&
+          ('_seconds' in childValue || '_latitude' in childValue));
+
+      if (childValue && typeof childValue === 'object' && !Array.isArray(childValue) && !isSpecialFirestoreValue) {
+        visitMap(childValue as Record<string, FirestoreValue>, fieldPath, depth + 1);
+      }
+    });
+  };
+
+  documents.forEach((doc) => {
+    if (doc.data) visitMap(doc.data);
+  });
+
+  return Array.from(fields).sort();
+};
+
+/**
  * Filters documents based on an array of filter conditions
  */
 export const filterDocumentsByConditions = (documents: Document[], filters: Filter[]): Document[] => {
@@ -130,14 +163,8 @@ export const sortDocuments = (documents: Document[], sortConfig: SortConfig | nu
     if (aVal == null) return 1;
     if (bVal == null) return -1;
 
-    // Compare values
-    let comparison = 0;
-
-    if (typeof aVal === 'number' && typeof bVal === 'number') {
-      comparison = aVal - bVal;
-    } else {
-      comparison = String(aVal).localeCompare(String(bVal));
-    }
+    const comparison =
+      typeof aVal === 'number' && typeof bVal === 'number' ? aVal - bVal : String(aVal).localeCompare(String(bVal));
 
     return isDescending ? -comparison : comparison;
   });

@@ -63,7 +63,7 @@ jobs:
           name: windows-builds
           path: |
             release/*Setup*.exe
-            release/*.yml
+            release/latest.yml
             release/*.blockmap
           retention-days: 5
 
@@ -112,7 +112,7 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
-            release/*.yml
+            release/latest-mac.yml
             release/*.blockmap
           retention-days: 5
 
@@ -150,7 +150,7 @@ jobs:
             release/*.deb
             release/*.AppImage
             release/*.tar.gz
-            release/*.yml
+            release/latest-linux.yml
           retention-days: 5
 
   create-release:

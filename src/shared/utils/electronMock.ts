@@ -46,7 +46,7 @@ const mockElectronAPI: ElectronAPI = {
   },
 
   // Query
-  query: async (_params: GetDocumentsParams) => {
+  query: async (_params: RunQueryParams) => {
     return { success: false, error: 'Requires Electron mode' };
   },
 
@@ -221,6 +221,12 @@ const mockElectronAPI: ElectronAPI = {
   setNativeTheme: (theme: 'system' | 'light' | 'dark') => {
     console.log('[Mock] setNativeTheme:', theme);
   },
+  getAutoUpdateState: async () => ({
+    status: 'idle',
+    currentVersion: 'development',
+  }),
+  downloadUpdate: async () => ({ success: false, error: 'Requires Electron mode' }),
+  installUpdate: async () => ({ success: false, error: 'Requires Electron mode' }),
   exportCollections: async () => {
     console.warn('[Mock] exportCollections');
     return { success: false, error: 'Requires Electron mode' };

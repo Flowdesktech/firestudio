@@ -4,17 +4,40 @@
  * - Downloads only after the user confirms; restart after download when they agree.
  */
 
-const { app, dialog, BrowserWindow } = require('electron');
+const { app, dialog, BrowserWindow, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
 let dailyTimer = null;
+let ipcHandlersRegistered = false;
+let downloadRequested = false;
 /** When true, next `update-not-available` shows a dialog (Help → Check for Updates). */
 let manualCheckPending = false;
+let updateState = {
+  status: 'idle',
+  currentVersion: app.getVersion(),
+};
 
 function getParentWindow() {
   return BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null;
+}
+
+function broadcastState() {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('auto-update:state', updateState);
+    }
+  });
+}
+
+function setUpdateState(nextState) {
+  updateState = {
+    ...updateState,
+    ...nextState,
+    currentVersion: app.getVersion(),
+  };
+  broadcastState();
 }
 
 function formatReleaseNotes(releaseNotes) {
@@ -29,10 +52,57 @@ function formatReleaseNotes(releaseNotes) {
   return String(releaseNotes);
 }
 
+function registerIpcHandlers() {
+  if (ipcHandlersRegistered) return;
+  ipcHandlersRegistered = true;
+
+  ipcMain.handle('auto-update:getState', () => updateState);
+
+  ipcMain.handle('auto-update:download', async () => {
+    if (updateState.status !== 'available' && updateState.status !== 'error') {
+      return { success: false, error: 'No update is ready to download.' };
+    }
+
+    downloadRequested = true;
+    setUpdateState({
+      status: 'downloading',
+      progress: {
+        percent: 0,
+        bytesPerSecond: 0,
+        transferred: 0,
+        total: 0,
+      },
+      error: undefined,
+    });
+
+    try {
+      await autoUpdater.downloadUpdate();
+      return { success: true };
+    } catch (err) {
+      const message = err?.message || String(err);
+      setUpdateState({ status: 'error', error: message });
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle('auto-update:install', () => {
+    if (updateState.status !== 'downloaded') {
+      return { success: false, error: 'The update has not finished downloading.' };
+    }
+
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(false, true);
+    });
+    return { success: true };
+  });
+}
+
 /**
  * Call once after app is ready. No-op in development / unpackaged runs.
  */
 function setupAutoUpdate() {
+  registerIpcHandlers();
+
   if (!app.isPackaged) {
     return;
   }
@@ -41,6 +111,7 @@ function setupAutoUpdate() {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('update-not-available', () => {
+    setUpdateState({ status: 'idle', version: undefined, releaseNotes: undefined, progress: undefined });
     if (!manualCheckPending) return;
     manualCheckPending = false;
     const win = getParentWindow();
@@ -55,79 +126,51 @@ function setupAutoUpdate() {
     else dialog.showMessageBox(opts);
   });
 
-  autoUpdater.on('update-available', async (info) => {
+  autoUpdater.on('update-available', (info) => {
     manualCheckPending = false;
-    const win = getParentWindow();
-    const notes = formatReleaseNotes(info.releaseNotes).trim();
-    const detail =
-      (notes ? `${notes.slice(0, 4000)}${notes.length > 4000 ? '\n…' : ''}\n\n` : '') +
-      'Download the update now? You can install it after the download finishes.';
-
-    const { response } = win
-      ? await dialog.showMessageBox(win, {
-          type: 'info',
-          title: 'Update available',
-          message: `Firestudio ${info.version} is available.`,
-          detail: `You are on ${app.getVersion()}.\n\n${detail}`,
-          buttons: ['Download', 'Not now'],
-          defaultId: 0,
-          cancelId: 1,
-          noLink: true,
-        })
-      : await dialog.showMessageBox({
-          type: 'info',
-          title: 'Update available',
-          message: `Firestudio ${info.version} is available.`,
-          detail: `You are on ${app.getVersion()}.\n\n${detail}`,
-          buttons: ['Download', 'Not now'],
-          defaultId: 0,
-          cancelId: 1,
-          noLink: true,
-        });
-
-    if (response === 0) {
-      try {
-        await autoUpdater.downloadUpdate();
-      } catch (err) {
-        dialog.showErrorBox('Download failed', err?.message || String(err));
-      }
-    }
+    downloadRequested = false;
+    setUpdateState({
+      status: 'available',
+      version: info.version,
+      releaseName: info.releaseName || '',
+      releaseNotes: formatReleaseNotes(info.releaseNotes).trim(),
+      releaseDate: info.releaseDate,
+      progress: undefined,
+      error: undefined,
+    });
   });
 
-  autoUpdater.on('update-downloaded', async () => {
-    const win = getParentWindow();
-    const { response } = win
-      ? await dialog.showMessageBox(win, {
-          type: 'info',
-          title: 'Update ready',
-          message: 'The new version has been downloaded.',
-          detail: 'Restart Firestudio now to finish installing?',
-          buttons: ['Restart now', 'Later'],
-          defaultId: 0,
-          cancelId: 1,
-          noLink: true,
-        })
-      : await dialog.showMessageBox({
-          type: 'info',
-          title: 'Update ready',
-          message: 'The new version has been downloaded.',
-          detail: 'Restart Firestudio now to finish installing?',
-          buttons: ['Restart now', 'Later'],
-          defaultId: 0,
-          cancelId: 1,
-          noLink: true,
-        });
+  autoUpdater.on('download-progress', (progress) => {
+    setUpdateState({
+      status: 'downloading',
+      progress: {
+        percent: progress.percent,
+        bytesPerSecond: progress.bytesPerSecond,
+        transferred: progress.transferred,
+        total: progress.total,
+      },
+    });
+  });
 
-    if (response === 0) {
-      setImmediate(() => {
-        autoUpdater.quitAndInstall(false, true);
-      });
-    }
+  autoUpdater.on('update-downloaded', () => {
+    downloadRequested = false;
+    setUpdateState({
+      status: 'downloaded',
+      progress: {
+        ...(updateState.progress || {}),
+        percent: 100,
+      },
+      error: undefined,
+    });
   });
 
   autoUpdater.on('error', (err) => {
     manualCheckPending = false;
     console.warn('[autoUpdate]', err?.message || err);
+    if (downloadRequested || updateState.status === 'downloading') {
+      downloadRequested = false;
+      setUpdateState({ status: 'error', error: err?.message || String(err) });
+    }
   });
 
   const runCheck = () => {

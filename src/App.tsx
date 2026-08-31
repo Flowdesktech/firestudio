@@ -58,6 +58,7 @@ import { getErrorMessage } from './shared/utils/commonUtils';
 // Components
 import AppLayout from './app/components/AppLayout';
 import GlobalDialogs from './app/components/GlobalDialogs';
+import UpdateDialog from './app/components/UpdateDialog';
 import CollectionTab from './features/collections/components/CollectionTab';
 import StorageTab from './features/storage/components/StorageTab';
 import AuthTab from './features/auth/components/AuthTab';
@@ -692,5 +693,10 @@ function FirestudioApp() {
 }
 
 export default function App() {
-  return <FirestudioApp />;
+  return (
+    <>
+      <FirestudioApp />
+      <UpdateDialog />
+    </>
+  );
 }

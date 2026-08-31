@@ -55,6 +55,13 @@ interface GetDocumentsParams {
   orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
 }
 
+interface RunQueryParams {
+  collectionPath: string;
+  queries?: Array<{ field: string; operator: string; value: unknown }>;
+  orderBy?: { field: string; direction: 'asc' | 'desc' };
+  limit?: number;
+}
+
 interface CreateDocumentParams {
   collectionPath: string;
   documentId?: string;
@@ -207,6 +214,32 @@ interface EmulatorConfigResult {
   error?: string;
 }
 
+type AutoUpdateStatus = 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+
+interface AutoUpdateProgress {
+  percent: number;
+  bytesPerSecond?: number;
+  transferred?: number;
+  total?: number;
+}
+
+interface AutoUpdateState {
+  status: AutoUpdateStatus;
+  currentVersion: string;
+  version?: string;
+  releaseName?: string;
+  /** Sanitized in the renderer before being inserted as HTML. */
+  releaseNotes?: string;
+  releaseDate?: string;
+  progress?: AutoUpdateProgress;
+  error?: string;
+}
+
+interface AutoUpdateActionResult {
+  success: boolean;
+  error?: string;
+}
+
 interface ElectronAPI {
   // Firebase
   connectFirebase: (params: ConnectFirebaseParams) => Promise<ConnectFirebaseResult>;
@@ -232,7 +265,7 @@ interface ElectronAPI {
   deleteCollection: (collectionPath: string) => Promise<{ success: boolean; error?: string }>;
 
   // Query
-  query: (params: GetDocumentsParams) => Promise<{ success: boolean; documents?: FirestoreDocument[]; error?: string }>;
+  query: (params: RunQueryParams) => Promise<{ success: boolean; documents?: FirestoreDocument[]; error?: string }>;
 
   // Import/Export
   exportCollection: (collectionPath: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
@@ -336,6 +369,11 @@ interface ElectronAPI {
   openExternal: (url: string) => Promise<void>;
   selectFile: (options: SelectFileOptions) => Promise<{ canceled: boolean; filePaths: string[] }>;
   setNativeTheme: (theme: 'system' | 'light' | 'dark') => void;
+
+  // Auto-update
+  getAutoUpdateState: () => Promise<AutoUpdateState>;
+  downloadUpdate: () => Promise<AutoUpdateActionResult>;
+  installUpdate: () => Promise<AutoUpdateActionResult>;
 
   // Export
   exportCollections: () => Promise<{

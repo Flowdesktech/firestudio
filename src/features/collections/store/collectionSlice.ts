@@ -1,7 +1,12 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { refreshCollections, Project } from '../../projects/store/projectsSlice';
 import { closeTab, addTab } from '../../../app/store/slices/uiSlice';
-import { getParsedStructuredQuery, parseQueryResponse, QueryResponseItem } from '../../../shared/utils/queryUtils';
+import {
+  buildStructuredQuery,
+  getParsedStructuredQuery,
+  parseQueryResponse,
+  QueryResponseItem,
+} from '../../../shared/utils/queryUtils';
 import { parseFirestoreFields, FirestoreValue } from '../../../shared/utils/firestoreUtils';
 import { downloadJson } from '../../../shared/utils/commonUtils';
 import { RootState } from '../../../app/store';
@@ -168,6 +173,29 @@ interface QueryOptions {
   orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
 }
 
+function parseSimpleFilterValue(value: FirestoreValue): FirestoreValue {
+  if (typeof value !== 'string') return value;
+
+  const trimmed = value.trim();
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (trimmed === 'null') return null;
+  if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
+
+  if (
+    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+    (trimmed.startsWith('{') && trimmed.endsWith('}'))
+  ) {
+    try {
+      return JSON.parse(trimmed) as FirestoreValue;
+    } catch {
+      // Keep invalid JSON as a string so Firestore returns a useful query result/error.
+    }
+  }
+
+  return value;
+}
+
 export const fetchDocuments = createAppAsyncThunk<
   { documents: Document[] },
   { project: Project; collection: string; key: string; firestoreDatabaseId?: string }
@@ -222,18 +250,11 @@ export const fetchDocuments = createAppAsyncThunk<
         if (filters && filters.length > 0) {
           options.where = filters
             .filter((f) => f.field && f.value !== '')
-            .map((f) => {
-              let value = f.value;
-              if (value === 'true') value = true;
-              else if (value === 'false') value = false;
-              else if (!isNaN(Number(value)) && value !== '' && typeof value === 'string') value = Number(value);
-
-              return {
-                field: f.field,
-                op: f.operator,
-                value: value,
-              };
-            });
+            .map((f) => ({
+              field: f.field,
+              op: f.operator,
+              value: parseSimpleFilterValue(f.value),
+            }));
         }
 
         // Sort
@@ -246,24 +267,65 @@ export const fetchDocuments = createAppAsyncThunk<
           ];
         }
 
+        const hasConstraints = Boolean(options.where?.length || options.orderBy?.length);
+
         if (project.authMethod === 'google') {
-          const res = await electron.googleGetDocuments({
-            projectId: project.projectId,
-            collectionPath: collection,
-            ...options,
-            databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
-          });
-          if (!res.success) throw new Error(res.error);
-          documents = (res.documents || []) as Document[];
-          // Google documents might need parsing if raw? checks suggest they are usually parsed by main process or clean.
-          // googleGetDocuments usually returns formatted docs.
+          if (hasConstraints) {
+            const structuredQuery = buildStructuredQuery({
+              collection,
+              limit: parsedLimit,
+              select: [],
+              where: (options.where || []).map((filter) => ({
+                field: filter.field,
+                operator: filter.op,
+                value: filter.value as FirestoreValue,
+              })),
+              orderBy: options.orderBy?.[0]
+                ? {
+                    field: options.orderBy[0].field,
+                    direction: options.orderBy[0].direction,
+                  }
+                : null,
+            });
+            const res = await electron.googleExecuteStructuredQuery({
+              projectId: project.projectId,
+              structuredQuery,
+              databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
+            });
+            if (!res.success) throw new Error(res.error);
+            documents = parseQueryResponse(
+              (res.data || []) as QueryResponseItem[],
+              collection,
+              parseFirestoreFields,
+            ) as unknown as Document[];
+          } else {
+            const res = await electron.googleGetDocuments({
+              projectId: project.projectId,
+              collectionPath: collection,
+              limit: parsedLimit,
+              databaseId: getGoogleApiDatabaseId(project, firestoreDatabaseId),
+            });
+            if (!res.success) throw new Error(res.error);
+            documents = (res.documents || []) as Document[];
+          }
         } else {
           await connectForProject(electron, project, firestoreDatabaseId);
 
-          const res = await electron.getDocuments({
-            collectionPath: collection,
-            ...options,
-          });
+          const res = hasConstraints
+            ? await electron.query({
+                collectionPath: collection,
+                queries: (options.where || []).map((filter) => ({
+                  field: filter.field,
+                  operator: filter.op,
+                  value: filter.value,
+                })),
+                orderBy: options.orderBy?.[0],
+                limit: parsedLimit,
+              })
+            : await electron.getDocuments({
+                collectionPath: collection,
+                limit: parsedLimit,
+              });
           if (!res.success) throw new Error(res.error);
           documents = (res.documents || []) as Document[];
         }

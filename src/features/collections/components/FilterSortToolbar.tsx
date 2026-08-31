@@ -1,5 +1,14 @@
-import React, { useRef, useEffect } from 'react';
-import { Box, Button, IconButton, Typography } from '@mui/material';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  Autocomplete,
+  Box,
+  Button,
+  IconButton,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { FilterList as FilterIcon, Sort as SortIcon } from '@mui/icons-material';
 import { Filter, SortConfig } from '../store/collectionSlice';
 
@@ -22,6 +31,17 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
 }) => {
   const [filterMenuOpen, setFilterMenuOpen] = React.useState(false);
   const [sortMenuOpen, setSortMenuOpen] = React.useState(false);
+  const fieldOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...allFields,
+          ...filters.map((filter) => filter.field).filter(Boolean),
+          ...(sortConfig.field ? [sortConfig.field] : []),
+        ]),
+      ).sort(),
+    [allFields, filters, sortConfig.field],
+  );
 
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
@@ -29,6 +49,10 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
   // Close popups when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Element;
+      // MUI Select/Autocomplete menus can render in a portal outside these refs.
+      if (target.closest('.MuiPopover-root, .MuiAutocomplete-popper')) return;
+
       if (filterMenuRef.current && !filterMenuRef.current.contains(e.target as Node)) {
         setFilterMenuOpen(false);
       }
@@ -75,7 +99,8 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
               borderRadius: 1,
               boxShadow: 3,
               zIndex: 1000,
-              minWidth: 320,
+              minWidth: 560,
+              maxWidth: 'calc(100vw - 32px)',
               p: 1.5,
             }}
           >
@@ -84,44 +109,58 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
             </Typography>
             {filters.map((filter, idx) => (
               <Box key={idx} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
-                <select
+                <Autocomplete
+                  freeSolo
+                  disablePortal
+                  options={fieldOptions}
                   value={filter.field}
-                  onChange={(e) => {
-                    setFilters(filters.map((f, i) => (i === idx ? { ...f, field: e.target.value } : f)));
+                  onInputChange={(_event, value) => {
+                    setFilters(filters.map((f, i) => (i === idx ? { ...f, field: value } : f)));
                   }}
-                  className="filter-select"
-                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
-                >
-                  <option value="">Select field</option>
-                  {allFields.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-                <select
+                  renderInput={(params) => <TextField {...params} size="small" placeholder="Field" />}
+                  sx={{
+                    flex: 1.4,
+                    minWidth: 180,
+                    '& .MuiInputBase-root': { fontSize: '0.8rem', height: 32 },
+                  }}
+                />
+                <Select
+                  size="small"
                   value={filter.operator}
                   onChange={(e) => {
                     setFilters(filters.map((f, i) => (i === idx ? { ...f, operator: e.target.value } : f)));
                   }}
-                  style={{ width: 70, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
+                  sx={{ width: 140, height: 32, fontSize: '0.8rem' }}
                 >
-                  <option value="==">==</option>
-                  <option value="!=">!=</option>
-                  <option value="<">&lt;</option>
-                  <option value=">">&gt;</option>
-                  <option value="<=">≤</option>
-                  <option value=">=">≥</option>
-                </select>
-                <input
+                  <MenuItem value="==">equals (==)</MenuItem>
+                  <MenuItem value="!=">not equal (!=)</MenuItem>
+                  <MenuItem value="<">less than (&lt;)</MenuItem>
+                  <MenuItem value="<=">at most (≤)</MenuItem>
+                  <MenuItem value=">">greater than (&gt;)</MenuItem>
+                  <MenuItem value=">=">at least (≥)</MenuItem>
+                  <MenuItem value="array-contains">array contains</MenuItem>
+                  <MenuItem value="array-contains-any">array contains any</MenuItem>
+                  <MenuItem value="in">in</MenuItem>
+                  <MenuItem value="not-in">not in</MenuItem>
+                </Select>
+                <TextField
+                  size="small"
                   value={filter.value === null || filter.value === undefined ? '' : String(filter.value)}
                   onChange={(e) => {
                     setFilters(filters.map((f, i) => (i === idx ? { ...f, value: e.target.value } : f)));
                   }}
                   placeholder="Value"
-                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', borderRadius: 4 }}
+                  title="Use JSON arrays for in, not-in, and array-contains-any"
+                  sx={{ flex: 1, minWidth: 140, '& .MuiInputBase-root': { fontSize: '0.8rem', height: 32 } }}
                 />
-                <IconButton size="small" onClick={() => setFilters(filters.filter((_, i) => i !== idx))}>
+                <IconButton
+                  size="small"
+                  aria-label="Remove filter"
+                  onClick={() => {
+                    setFilters(filters.filter((_, i) => i !== idx));
+                    onApply?.();
+                  }}
+                >
                   ×
                 </IconButton>
               </Box>
@@ -139,7 +178,7 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
                 variant="contained"
                 onClick={() => {
                   setFilterMenuOpen(false);
-                  setTimeout(() => onApply?.(), 50);
+                  onApply?.();
                 }}
                 sx={{ fontSize: '0.75rem', ml: 1 }}
               >
@@ -177,68 +216,65 @@ const FilterSortToolbar: React.FC<FilterSortToolbarProps> = ({
               borderRadius: 1,
               boxShadow: 3,
               zIndex: 1000,
-              minWidth: 200,
-              p: 1,
+              minWidth: 360,
+              p: 1.5,
             }}
           >
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 1, color: 'text.primary' }}>Sort By</Typography>
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 0.5,
-                maxHeight: 200,
-                overflow: 'auto',
-              }}
-            >
-              <Box
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Autocomplete
+                freeSolo
+                disablePortal
+                options={fieldOptions}
+                value={sortConfig.field || ''}
+                onInputChange={(_event, value) => {
+                  setSortConfig({ field: value || null, direction: sortConfig.direction });
+                }}
+                renderInput={(params) => <TextField {...params} size="small" placeholder="Search fields…" />}
+                sx={{
+                  flex: 1,
+                  '& .MuiInputBase-root': { fontSize: '0.8rem', height: 32 },
+                }}
+              />
+              <Select
+                size="small"
+                value={sortConfig.direction}
+                onChange={(event) =>
+                  setSortConfig({
+                    field: sortConfig.field,
+                    direction: event.target.value as 'asc' | 'desc',
+                  })
+                }
+                sx={{ width: 120, height: 32, fontSize: '0.8rem' }}
+              >
+                <MenuItem value="asc">Ascending</MenuItem>
+                <MenuItem value="desc">Descending</MenuItem>
+              </Select>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 1.5 }}>
+              <Button
+                size="small"
                 onClick={() => {
                   setSortConfig({ field: null, direction: 'asc' });
                   setSortMenuOpen(false);
-                  setTimeout(() => onApply?.(), 50);
+                  onApply?.();
                 }}
-                sx={{
-                  px: 1,
-                  py: 0.5,
-                  cursor: 'pointer',
-                  borderRadius: 0.5,
-                  '&:hover': { bgcolor: 'action.hover' },
-                  color: !sortConfig.field ? 'primary.main' : 'text.primary',
-                }}
+                sx={{ fontSize: '0.75rem', textTransform: 'none' }}
               >
-                None
-              </Box>
-              {allFields.map((f) => (
-                <Box
-                  key={f}
-                  onClick={() => {
-                    if (sortConfig.field === f) {
-                      setSortConfig({
-                        field: f,
-                        direction: sortConfig.direction === 'asc' ? 'desc' : 'asc',
-                      });
-                    } else {
-                      setSortConfig({ field: f, direction: 'asc' });
-                    }
-                    setSortMenuOpen(false);
-                    setTimeout(() => onApply?.(), 50);
-                  }}
-                  sx={{
-                    px: 1,
-                    py: 0.5,
-                    cursor: 'pointer',
-                    borderRadius: 0.5,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    '&:hover': { bgcolor: 'action.hover' },
-                    color: sortConfig.field === f ? 'primary.main' : 'text.primary',
-                    fontWeight: sortConfig.field === f ? 600 : 400,
-                  }}
-                >
-                  <span style={{ fontSize: '0.8rem' }}>{f}</span>
-                  {sortConfig.field === f && <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>}
-                </Box>
-              ))}
+                Clear
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                disabled={!sortConfig.field}
+                onClick={() => {
+                  setSortMenuOpen(false);
+                  onApply?.();
+                }}
+                sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+              >
+                Apply
+              </Button>
             </Box>
           </Box>
         )}

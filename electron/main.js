@@ -22,6 +22,10 @@ const isDev = process.env.NODE_ENV === 'development';
 
 // Set app name for OS-level identification (taskbar, firewall dialogs, etc.)
 app.setName('Firestudio');
+process.title = 'Firestudio';
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.flowdesk.firestudio');
+}
 
 // ============================================
 // Window Management
@@ -39,6 +43,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
     titleBarStyle: 'default',
+    title: 'Firestudio',
     icon: path.join(__dirname, '../assets/icon.png'),
   });
 
