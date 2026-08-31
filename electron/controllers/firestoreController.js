@@ -6,10 +6,10 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const vm = require('vm');
+const { FieldValue, Filter, Timestamp, GeoPoint } = require('firebase-admin/firestore');
 const { fetchDocumentsPage } = require('./firestore/documentList');
 const { firestoreDocumentToData } = require('../utils/firestoreHelpers');
 
-let adminRef = null;
 let dbRef = null;
 
 function normalizeFirestoreError(error) {
@@ -24,10 +24,11 @@ function normalizeFirestoreError(error) {
 }
 
 /**
- * Sets references to admin SDK and database
+ * Sets reference to the Firestore database. The `admin` arg is accepted for
+ * backwards compatibility with callers but is unused under firebase-admin v14.
  */
 function setRefs(admin, db) {
-  adminRef = admin;
+  void admin;
   dbRef = db;
 }
 
@@ -235,10 +236,7 @@ function registerHandlers() {
       if (!dbRef) throw new Error('Not connected to Firebase');
 
       const wrappedCode = `(async () => { ${jsQuery} return await run(); })()`;
-      const FieldValue = adminRef ? adminRef.firestore.FieldValue : null;
-      const Filter = adminRef ? adminRef.firestore.Filter : null;
-      const Timestamp = adminRef ? adminRef.firestore.Timestamp : null;
-      const GeoPoint = adminRef ? adminRef.firestore.GeoPoint : null;
+      // ponytail: firebase-admin v14 removed the `.firestore` namespace; these are top-level exports
       const context = vm.createContext({
         db: dbRef,
         FieldValue,

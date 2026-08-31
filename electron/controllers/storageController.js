@@ -7,6 +7,7 @@ const { ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fetch = require('node-fetch');
+const { getStorage } = require('firebase-admin/storage');
 const googleController = require('./googleController');
 const {
   resolveAdminBucket,
@@ -52,8 +53,9 @@ function normalizeStorageItem(item, prefix) {
 }
 
 function getProjectId() {
-  if (adminRef?.apps?.length > 0) {
-    return adminRef.app().options.credential?.projectId || adminRef.app().options.projectId;
+  if (adminRef?.getApps().length > 0) {
+    const app = adminRef.getApps()[0];
+    return app.options.credential?.projectId || app.options.projectId;
   }
   return null;
 }
@@ -90,7 +92,7 @@ function registerHandlers() {
         return { success: true, items: [...folders, ...fileList], currentPath: storagePath };
       }
 
-      const bucket = adminRef.storage().bucket(bucketName);
+      const bucket = getStorage().bucket(bucketName);
       const [files] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
       const [, , apiResponse] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
 
@@ -148,7 +150,7 @@ function registerHandlers() {
         return { success: true, fileName, path: destination };
       }
 
-      const bucket = adminRef.storage().bucket(bucketName);
+      const bucket = getStorage().bucket(bucketName);
       await bucket.upload(localPath, {
         destination,
         metadata: { contentType: require('mime-types').lookup(localPath) || 'application/octet-stream' },
@@ -181,7 +183,7 @@ function registerHandlers() {
         return { success: true, savedTo: savePath };
       }
 
-      const bucket = adminRef.storage().bucket(bucketName);
+      const bucket = getStorage().bucket(bucketName);
       await bucket.file(filePath).download({ destination: savePath });
       return { success: true, savedTo: savePath };
     } catch (error) {
@@ -210,7 +212,7 @@ function registerHandlers() {
         return { success: true, url };
       }
 
-      const bucket = adminRef.storage().bucket(bucketName);
+      const bucket = getStorage().bucket(bucketName);
       const expiration = expiresInMs || 7 * 24 * 60 * 60 * 1000;
       const expiresDate = new Date(Date.now() + expiration);
       const expiresString = `${String(expiresDate.getMonth() + 1).padStart(2, '0')}-${String(expiresDate.getDate()).padStart(2, '0')}-${expiresDate.getFullYear()}`;
@@ -242,7 +244,7 @@ function registerHandlers() {
         return { success: true };
       }
 
-      await adminRef.storage().bucket(bucketName).file(filePath).delete();
+      await getStorage().bucket(bucketName).file(filePath).delete();
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -272,8 +274,7 @@ function registerHandlers() {
         return { success: true, folderPath };
       }
 
-      await adminRef
-        .storage()
+      await getStorage()
         .bucket(bucketName)
         .file(placeholderPath)
         .save('', { metadata: { contentType: 'application/x-empty' } });
@@ -312,7 +313,7 @@ function registerHandlers() {
         };
       }
 
-      const [metadata] = await adminRef.storage().bucket(bucketName).file(filePath).getMetadata();
+      const [metadata] = await getStorage().bucket(bucketName).file(filePath).getMetadata();
       return {
         success: true,
         metadata: {

@@ -12,6 +12,15 @@ require_.cache[require_.resolve('node-fetch')] = {
   exports: fetchMock,
 };
 
+// bucketResolver (v14) uses getStorage() from firebase-admin/storage
+const getStorageMock = { bucket: vi.fn() };
+require_.cache[require_.resolve('firebase-admin/storage')] = {
+  id: 'firebase-admin/storage',
+  filename: require_.resolve('firebase-admin/storage'),
+  loaded: true,
+  exports: { getStorage: () => getStorageMock },
+};
+
 const resolverPath = require_.resolve('./bucketResolver');
 delete require_.cache[resolverPath];
 const { resolveAdminBucket, resolveOauthBucket, resolveEmulatorBucket, clearBucketCache } = require_(resolverPath);
@@ -24,7 +33,8 @@ function adminRefWithBuckets(existingBuckets) {
       return Promise.resolve([existingBuckets.includes(name)]);
     },
   }));
-  return { adminRef: { storage: () => ({ bucket: bucketMock }) }, existsMock };
+  getStorageMock.bucket = bucketMock;
+  return { existsMock };
 }
 
 describe('bucketResolver', () => {
@@ -64,13 +74,11 @@ describe('bucketResolver', () => {
   });
 
   it('resolveAdminBucket treats probe errors as missing buckets', async () => {
-    const adminRef = {
-      storage: () => ({
-        bucket: () => ({ exists: () => Promise.reject(new Error('network')) }),
-      }),
-    };
+    getStorageMock.bucket = vi.fn(() => ({
+      exists: () => Promise.reject(new Error('network')),
+    }));
 
-    expect(await resolveAdminBucket(adminRef, 'p1')).toBe('p1.firebasestorage.app');
+    expect(await resolveAdminBucket(null, 'p1')).toBe('p1.firebasestorage.app');
   });
 
   it('clearBucketCache forces a re-probe', async () => {
