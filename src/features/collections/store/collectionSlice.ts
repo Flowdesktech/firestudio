@@ -182,10 +182,7 @@ function parseSimpleFilterValue(value: FirestoreValue): FirestoreValue {
   if (trimmed === 'null') return null;
   if (trimmed !== '' && !Number.isNaN(Number(trimmed))) return Number(trimmed);
 
-  if (
-    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
-    (trimmed.startsWith('{') && trimmed.endsWith('}'))
-  ) {
+  if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
     try {
       return JSON.parse(trimmed) as FirestoreValue;
     } catch {

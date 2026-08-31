@@ -8,7 +8,7 @@ const readFileSyncMock = vi.fn();
 const handleMock = vi.fn();
 const mockAppDelete = vi.fn().mockResolvedValue(undefined);
 const mockSettings = vi.fn();
-/** Simulates firebase-admin `apps` after initializeApp */
+/** Simulates firebase-admin apps after initializeApp (v14: getApps() returns an array) */
 const mockAppsList = [];
 
 // Inject electron mock into require cache
@@ -32,7 +32,7 @@ require_.cache[require_.resolve('fs')] = {
   },
 };
 
-// Inject firebase-admin mock
+// Inject firebase-admin mock (v14 modular API)
 const firebaseAdminPath = require_.resolve('firebase-admin');
 require_.cache[firebaseAdminPath] = {
   id: 'firebase-admin',
@@ -40,16 +40,24 @@ require_.cache[firebaseAdminPath] = {
   loaded: true,
   exports: {
     initializeApp: vi.fn(() => {
-      const app = { delete: mockAppDelete };
+      const app = { options: {}, delete: mockAppDelete };
       mockAppsList.push(app);
       return app;
     }),
-    credential: { cert: vi.fn().mockReturnValue('mock-credential') },
-    firestore: vi.fn().mockReturnValue({ settings: mockSettings }),
-    app: vi.fn(() => mockAppsList[0]),
-    get apps() {
-      return mockAppsList;
-    },
+    cert: vi.fn().mockReturnValue('mock-credential'),
+    getApps: () => mockAppsList,
+    deleteApp: mockAppDelete,
+  },
+};
+
+// Inject firebase-admin/firestore mock (v14 modular API)
+const firestoreModulePath = require_.resolve('firebase-admin/firestore');
+require_.cache[firestoreModulePath] = {
+  id: 'firebase-admin/firestore',
+  filename: firestoreModulePath,
+  loaded: true,
+  exports: {
+    getFirestore: vi.fn().mockReturnValue({ settings: mockSettings }),
   },
 };
 

@@ -6,6 +6,7 @@
 
 const { ipcMain } = require('electron');
 const fetch = require('node-fetch');
+const { getAuth } = require('firebase-admin/auth');
 
 let adminRef = null;
 let authEmulatorHost = null;
@@ -19,8 +20,8 @@ function setAuthEmulatorHost(host) {
 }
 
 function getProjectId() {
-  if (adminRef?.apps?.length > 0) {
-    return adminRef.app().options.projectId;
+  if (adminRef?.getApps().length > 0) {
+    return adminRef.getApps()[0].options.projectId;
   }
   return null;
 }
@@ -77,8 +78,8 @@ function registerHandlers() {
         return { success: true, users };
       }
 
-      if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
-      const listUsersResult = await adminRef.auth().listUsers(maxResults);
+      if (!adminRef?.getApps().length) throw new Error('Not connected to Firebase');
+      const listUsersResult = await getAuth().listUsers(maxResults);
       const users = listUsersResult.users.map((user) => ({
         uid: user.uid,
         email: user.email,
@@ -134,7 +135,7 @@ function registerHandlers() {
           };
         }
 
-        if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
+        if (!adminRef?.getApps().length) throw new Error('Not connected to Firebase');
         const userData = { email, password };
         if (displayName) userData.displayName = displayName;
         if (phoneNumber) userData.phoneNumber = phoneNumber;
@@ -142,7 +143,7 @@ function registerHandlers() {
         if (photoURL) userData.photoURL = photoURL;
         if (disabled) userData.disabled = disabled;
         if (emailVerified) userData.emailVerified = emailVerified;
-        const userRecord = await adminRef.auth().createUser(userData);
+        const userRecord = await getAuth().createUser(userData);
         return {
           success: true,
           user: { uid: userRecord.uid, email: userRecord.email, displayName: userRecord.displayName },
@@ -185,7 +186,7 @@ function registerHandlers() {
           };
         }
 
-        if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
+        if (!adminRef?.getApps().length) throw new Error('Not connected to Firebase');
         const updateData = {};
         if (email !== undefined) updateData.email = email;
         if (password !== undefined) updateData.password = password;
@@ -194,7 +195,7 @@ function registerHandlers() {
         if (disabled !== undefined) updateData.disabled = disabled;
         if (photoURL !== undefined) updateData.photoURL = photoURL;
         if (emailVerified !== undefined) updateData.emailVerified = emailVerified;
-        const userRecord = await adminRef.auth().updateUser(uid, updateData);
+        const userRecord = await getAuth().updateUser(uid, updateData);
         return {
           success: true,
           user: {
@@ -230,8 +231,8 @@ function registerHandlers() {
         return { success: true };
       }
 
-      if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
-      await adminRef.auth().deleteUser(uid);
+      if (!adminRef?.getApps().length) throw new Error('Not connected to Firebase');
+      await getAuth().deleteUser(uid);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -261,8 +262,8 @@ function registerHandlers() {
         return { success: true, user: normalizeUserRecord(data.users[0]) };
       }
 
-      if (!adminRef?.apps?.length) throw new Error('Not connected to Firebase');
-      const userRecord = await adminRef.auth().getUser(uid);
+      if (!adminRef?.getApps().length) throw new Error('Not connected to Firebase');
+      const userRecord = await getAuth().getUser(uid);
       return {
         success: true,
         user: {

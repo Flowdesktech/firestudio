@@ -5,6 +5,7 @@
 
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
+const { getFirestore } = require('firebase-admin/firestore');
 
 let admin = null;
 let db = null;
@@ -65,10 +66,11 @@ function registerHandlers() {
       // Never call app().delete() unless an app exists — after a failed connect, `admin` may
       // still reference the SDK module while no default app was initialized, which throws:
       // "The default Firebase app does not exist".
-      const existingApps = [...adminSdk.apps];
+      // ponytail: firebase-admin v14 removed the `apps` getter and `app.delete()`; use getApps() + deleteApp()
+      const existingApps = adminSdk.getApps();
       for (const appInstance of existingApps) {
         try {
-          await appInstance.delete();
+          await adminSdk.deleteApp(appInstance);
         } catch (e) {
           void e;
         }
@@ -80,7 +82,7 @@ function registerHandlers() {
         const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
         projectId = serviceAccount.project_id;
         adminSdk.initializeApp({
-          credential: adminSdk.credential.cert(serviceAccount),
+          credential: adminSdk.cert(serviceAccount),
           projectId,
         });
       } else if (emulatorHost && explicitProjectId) {
@@ -91,7 +93,7 @@ function registerHandlers() {
       }
 
       admin = adminSdk;
-      db = adminSdk.firestore();
+      db = getFirestore();
 
       if (databaseId) {
         db.settings({ databaseId });
@@ -110,10 +112,10 @@ function registerHandlers() {
       currentStorageEmulatorHost = null;
       try {
         const adminSdk = require('firebase-admin');
-        const leftover = [...adminSdk.apps];
+        const leftover = adminSdk.getApps();
         for (const appInstance of leftover) {
           try {
-            await appInstance.delete();
+            await adminSdk.deleteApp(appInstance);
           } catch (e) {
             void e;
           }
@@ -132,10 +134,10 @@ function registerHandlers() {
   ipcMain.handle('firebase:disconnect', async () => {
     try {
       const adminSdk = admin || require('firebase-admin');
-      const existingApps = [...adminSdk.apps];
+      const existingApps = adminSdk.getApps();
       for (const appInstance of existingApps) {
         try {
-          await appInstance.delete();
+          await adminSdk.deleteApp(appInstance);
         } catch (e) {
           void e;
         }

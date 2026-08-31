@@ -43,6 +43,15 @@ require_.cache[require_.resolve('./storage/bucketResolver')] = {
   },
 };
 
+// storageController (v14) uses getStorage() from firebase-admin/storage
+const getStorageMock = { bucket: vi.fn() };
+require_.cache[require_.resolve('firebase-admin/storage')] = {
+  id: 'firebase-admin/storage',
+  filename: require_.resolve('firebase-admin/storage'),
+  loaded: true,
+  exports: { getStorage: () => getStorageMock },
+};
+
 const controllerPath = require_.resolve('./storageController');
 delete require_.cache[controllerPath];
 const { registerHandlers, setAdminRef, setStorageEmulatorHost } = require_(controllerPath);
@@ -54,10 +63,9 @@ for (const [channel, handler] of handleMock.mock.calls) {
 }
 
 function adminRefForProject(projectId, bucketImpl) {
+  getStorageMock.bucket = bucketImpl;
   return {
-    apps: [{}],
-    app: () => ({ options: { projectId } }),
-    storage: () => ({ bucket: bucketImpl }),
+    getApps: () => [{ options: { projectId } }],
   };
 }
 
