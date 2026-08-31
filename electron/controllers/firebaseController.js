@@ -5,6 +5,7 @@
 
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
+const { getFirestore } = require('firebase-admin/firestore');
 
 let admin = null;
 let db = null;
@@ -101,7 +102,7 @@ function registerHandlers() {
       const existingApps = [...adminFacade.apps];
       for (const appInstance of existingApps) {
         try {
-          await appInstance.delete();
+          await adminSdk.deleteApp(appInstance);
         } catch (e) {
           void e;
         }
@@ -146,7 +147,7 @@ function registerHandlers() {
         const leftover = [...getAdminCompatibilityFacade(adminSdk).apps];
         for (const appInstance of leftover) {
           try {
-            await appInstance.delete();
+            await adminSdk.deleteApp(appInstance);
           } catch (e) {
             void e;
           }
@@ -168,7 +169,7 @@ function registerHandlers() {
       const existingApps = [...adminSdk.apps];
       for (const appInstance of existingApps) {
         try {
-          await appInstance.delete();
+          await adminSdk.deleteApp(appInstance);
         } catch (e) {
           void e;
         }

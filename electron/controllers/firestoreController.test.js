@@ -28,6 +28,19 @@ require_.cache[require_.resolve('fs')] = {
   },
 };
 
+// firestoreController (v14) imports FieldValue/Filter/Timestamp/GeoPoint from firebase-admin/firestore
+require_.cache[require_.resolve('firebase-admin/firestore')] = {
+  id: 'firebase-admin/firestore',
+  filename: require_.resolve('firebase-admin/firestore'),
+  loaded: true,
+  exports: {
+    FieldValue: { serverTimestamp: vi.fn() },
+    Filter: { where: vi.fn() },
+    Timestamp: { now: vi.fn() },
+    GeoPoint: vi.fn(),
+  },
+};
+
 // Load controller with mocked deps
 const controllerPath = require_.resolve('./firestoreController');
 delete require_.cache[controllerPath];
@@ -253,16 +266,9 @@ describe('firestoreController', () => {
     });
     const mockDb = { collection: mockCollection };
 
-    const mockAdmin = {
-      firestore: {
-        FieldValue: { serverTimestamp: vi.fn() },
-        Filter: { where: vi.fn() },
-        Timestamp: { now: vi.fn() },
-        GeoPoint: vi.fn(),
-      },
-    };
-
-    setRefs(mockAdmin, mockDb);
+    // v14: FieldValue/Filter/Timestamp/GeoPoint come from firebase-admin/firestore (mocked above),
+    // not from adminRef — so adminRef is no longer needed here.
+    setRefs(null, mockDb);
 
     const jsQuery = `
       function run() {

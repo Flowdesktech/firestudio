@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const { getStorage } = require('firebase-admin/storage');
 
 const cache = new Map();
 
@@ -20,7 +21,7 @@ async function resolveWithProbe(cacheKey, candidates, probe) {
 function resolveAdminBucket(adminRef, projectId) {
   return resolveWithProbe(`admin:${projectId}`, bucketCandidates(projectId), async (bucketName) => {
     try {
-      const [exists] = await adminRef.storage().bucket(bucketName).exists();
+      const [exists] = await getStorage().bucket(bucketName).exists();
       return exists;
     } catch {
       return false;
