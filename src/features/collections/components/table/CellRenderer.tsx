@@ -10,6 +10,7 @@ import {
 import { MONOSPACE_FONT_FAMILY } from '../../../../shared/utils/constants';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
 import { TableThemeColors } from '../../../../app/theme';
+import { singleLineTruncation } from '../../../../shared/ui/textStyles';
 
 interface CellRendererProps {
   docId: string;
@@ -127,9 +128,7 @@ const CellRenderer: React.FC<CellRendererProps> = ({
         padding: '6px 8px',
         borderBottom: cellBorder,
         borderRight: cellBorder,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        ...singleLineTruncation,
         color: value === undefined ? (isDark ? '#6b6b6b' : '#a0a0a0') : getTypeColor(type, isDark),
         fontStyle: value === undefined ? 'italic' : 'normal',
         fontFamily: type === 'Array' || type === 'Map' || type === 'String' ? MONOSPACE_FONT_FAMILY : 'inherit',

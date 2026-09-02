@@ -13,6 +13,38 @@ let onConnectionChange = null;
 let currentAuthEmulatorHost = null;
 let currentStorageEmulatorHost = null;
 
+/**
+ * Firebase Admin v14 uses modular service functions instead of the legacy
+ * namespace methods (`apps`, `firestore()`, `auth()`, and `storage()`). Keep a
+ * small compatibility facade because the remaining Electron controllers use
+ * the namespace form.
+ */
+function getAdminCompatibilityFacade(adminSdk) {
+  if (typeof adminSdk.getApps !== 'function') return adminSdk;
+
+  const app = require('firebase-admin/app');
+  const firestore = require('firebase-admin/firestore');
+  const auth = require('firebase-admin/auth');
+  const storage = require('firebase-admin/storage');
+
+  return {
+    ...adminSdk,
+    get apps() {
+      return app.getApps();
+    },
+    app: app.getApp,
+    credential: { cert: app.cert },
+    firestore: Object.assign((firebaseApp) => firestore.getFirestore(firebaseApp), {
+      FieldValue: firestore.FieldValue,
+      Filter: firestore.Filter,
+      GeoPoint: firestore.GeoPoint,
+      Timestamp: firestore.Timestamp,
+    }),
+    auth: (firebaseApp) => auth.getAuth(firebaseApp),
+    storage: (firebaseApp) => storage.getStorage(firebaseApp),
+  };
+}
+
 function getAdmin() {
   return admin;
 }
@@ -62,12 +94,12 @@ function registerHandlers() {
       currentStorageEmulatorHost = storageEmulatorHost || null;
 
       const adminSdk = require('firebase-admin');
+      const adminFacade = getAdminCompatibilityFacade(adminSdk);
 
       // Never call app().delete() unless an app exists — after a failed connect, `admin` may
       // still reference the SDK module while no default app was initialized, which throws:
       // "The default Firebase app does not exist".
-      // ponytail: firebase-admin v14 removed the `apps` getter and `app.delete()`; use getApps() + deleteApp()
-      const existingApps = adminSdk.getApps();
+      const existingApps = [...adminFacade.apps];
       for (const appInstance of existingApps) {
         try {
           await adminSdk.deleteApp(appInstance);
@@ -82,7 +114,7 @@ function registerHandlers() {
         const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
         projectId = serviceAccount.project_id;
         adminSdk.initializeApp({
-          credential: adminSdk.cert(serviceAccount),
+          credential: adminFacade.credential.cert(serviceAccount),
           projectId,
         });
       } else if (emulatorHost && explicitProjectId) {
@@ -92,8 +124,8 @@ function registerHandlers() {
         throw new Error('Must provide either serviceAccountPath or emulatorHost with projectId');
       }
 
-      admin = adminSdk;
-      db = getFirestore();
+      admin = adminFacade;
+      db = adminFacade.firestore();
 
       if (databaseId) {
         db.settings({ databaseId });
@@ -112,7 +144,7 @@ function registerHandlers() {
       currentStorageEmulatorHost = null;
       try {
         const adminSdk = require('firebase-admin');
-        const leftover = adminSdk.getApps();
+        const leftover = [...getAdminCompatibilityFacade(adminSdk).apps];
         for (const appInstance of leftover) {
           try {
             await adminSdk.deleteApp(appInstance);
@@ -133,8 +165,8 @@ function registerHandlers() {
   // Disconnect from Firebase
   ipcMain.handle('firebase:disconnect', async () => {
     try {
-      const adminSdk = admin || require('firebase-admin');
-      const existingApps = adminSdk.getApps();
+      const adminSdk = admin || getAdminCompatibilityFacade(require('firebase-admin'));
+      const existingApps = [...adminSdk.apps];
       for (const appInstance of existingApps) {
         try {
           await adminSdk.deleteApp(appInstance);
@@ -172,4 +204,5 @@ module.exports = {
   getDb,
   getStorageEmulatorHost,
   setConnectionChangeCallback,
+  getAdminCompatibilityFacade,
 };
