@@ -10,6 +10,12 @@ const mockAppDelete = vi.fn().mockResolvedValue(undefined);
 const mockSettings = vi.fn();
 /** Simulates firebase-admin apps after initializeApp (v14: getApps() returns an array) */
 const mockAppsList = [];
+const TEST_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nmock-private-key\n-----END PRIVATE KEY-----\n';
+const createServiceAccount = (projectId) => ({
+  project_id: projectId,
+  client_email: 'firebase-adminsdk@test-project.iam.gserviceaccount.com',
+  private_key: TEST_PRIVATE_KEY,
+});
 
 // Inject electron mock into require cache
 require_.cache[require_.resolve('electron')] = {
@@ -50,6 +56,19 @@ require_.cache[firebaseAdminPath] = {
   },
 };
 
+// Inject firebase-admin/app mock because the compatibility facade imports the v14 modular API.
+const firebaseAdminAppModulePath = require_.resolve('firebase-admin/app');
+require_.cache[firebaseAdminAppModulePath] = {
+  id: 'firebase-admin/app',
+  filename: firebaseAdminAppModulePath,
+  loaded: true,
+  exports: {
+    cert: vi.fn().mockReturnValue('mock-credential'),
+    getApp: vi.fn(),
+    getApps: () => mockAppsList,
+  },
+};
+
 // Inject firebase-admin/firestore mock (v14 modular API)
 const firestoreModulePath = require_.resolve('firebase-admin/firestore');
 require_.cache[firestoreModulePath] = {
@@ -85,7 +104,7 @@ describe('firebaseController', () => {
   });
 
   it('connects with a valid service account path', async () => {
-    const serviceAccount = { project_id: 'test-project' };
+    const serviceAccount = createServiceAccount('test-project');
     readFileSyncMock.mockReturnValue(JSON.stringify(serviceAccount));
 
     const result = await handlers['firebase:connect'](null, {
@@ -97,7 +116,7 @@ describe('firebaseController', () => {
   });
 
   it('connects with databaseId', async () => {
-    const serviceAccount = { project_id: 'test-project' };
+    const serviceAccount = createServiceAccount('test-project');
     readFileSyncMock.mockReturnValue(JSON.stringify(serviceAccount));
 
     const result = await handlers['firebase:connect'](null, {
@@ -109,7 +128,7 @@ describe('firebaseController', () => {
   });
 
   it('supports backward compat with string param', async () => {
-    const serviceAccount = { project_id: 'legacy-project' };
+    const serviceAccount = createServiceAccount('legacy-project');
     readFileSyncMock.mockReturnValue(JSON.stringify(serviceAccount));
 
     const result = await handlers['firebase:connect'](null, '/legacy/path.json');
@@ -141,7 +160,7 @@ describe('firebaseController', () => {
     });
     expect(failResult.success).toBe(false);
 
-    const serviceAccount = { project_id: 'recovery-project' };
+    const serviceAccount = createServiceAccount('recovery-project');
     readFileSyncMock.mockReturnValue(JSON.stringify(serviceAccount));
     const okResult = await handlers['firebase:connect'](null, {
       serviceAccountPath: '/path/to/sa.json',
