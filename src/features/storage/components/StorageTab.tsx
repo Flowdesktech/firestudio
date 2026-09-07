@@ -26,6 +26,7 @@ import {
   Chip,
   FormControl,
   InputLabel,
+  InputAdornment,
   Select,
   useTheme,
   SelectChangeEvent,
@@ -50,6 +51,10 @@ import {
   Code as CodeIcon,
   Archive as ArchiveIcon,
   OpenInNew as OpenInNewIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { formatFileSize, copyToClipboard, confirmAction } from '../../../shared/utils/commonUtils';
 import { electronService } from '../../../shared/services/electronService';
@@ -126,22 +131,39 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlFileItem, setUrlFileItem] = useState<StorageItem | null>(null);
   const [bucketError, setBucketError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pageSize, setPageSize] = useState(50);
+  const [pageToken, setPageToken] = useState<string>();
+  const [previousPageTokens, setPreviousPageTokens] = useState<string[]>([]);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
 
   const isGoogle = project?.authMethod === 'google';
   const isEmulator = project?.authMethod === 'emulator';
-  const loadingRef = useRef(false);
+  const requestIdRef = useRef(0);
+
+  const resetPagination = useCallback(() => {
+    setPageToken(undefined);
+    setPreviousPageTokens([]);
+    setNextPageToken(null);
+    setSelectedItem(null);
+  }, []);
 
   const loadFiles = useCallback(async () => {
     if (!project) return;
-    // Prevent duplicate calls
-    if (loadingRef.current) return;
-    loadingRef.current = true;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setBucketError(null);
     try {
-      let result: { success: boolean; items?: StorageItem[]; error?: string };
+      const listParams = {
+        path: currentPath,
+        pageToken,
+        pageSize,
+        search: searchQuery,
+      };
+      let result: StorageListResult;
       if (isGoogle) {
-        result = await electron.googleStorageListFiles({ projectId: project.projectId, path: currentPath });
+        result = await electron.googleStorageListFiles({ projectId: project.projectId, ...listParams });
       } else if (isEmulator) {
         const storageHost = project.emulatorServices?.storage
           ? `${project.emulatorServices.storage.host}:${project.emulatorServices.storage.port}`
@@ -156,18 +178,20 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
           authEmulatorHost: authHost,
           storageEmulatorHost: storageHost,
         });
-        result = await electron.storageListFiles({ path: currentPath });
+        result = await electron.storageListFiles(listParams);
       } else {
         await electron.disconnectFirebase();
         await electron.connectFirebase({
           serviceAccountPath: project.serviceAccountPath!,
           databaseId: getServiceAccountConnectDatabaseId(project),
         });
-        result = await electron.storageListFiles({ path: currentPath });
+        result = await electron.storageListFiles(listParams);
       }
 
+      if (requestId !== requestIdRef.current) return;
       if (result.success) {
         setItems(result.items || []);
+        setNextPageToken(result.nextPageToken || null);
         setBucketError(null);
         addLog?.('success', `Loaded ${result.items?.length || 0} items from storage`);
       } else {
@@ -178,19 +202,33 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
           showMessage?.(result.error || 'Unknown error', 'error');
         }
         setItems([]);
+        setNextPageToken(null);
       }
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       showMessage?.((error as Error).message, 'error');
       setItems([]);
+      setNextPageToken(null);
     } finally {
-      loadingRef.current = false;
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
-  }, [project, currentPath, isGoogle, isEmulator, addLog, showMessage, electron]);
+  }, [project, currentPath, pageToken, pageSize, searchQuery, isGoogle, isEmulator, addLog, showMessage, electron]);
 
   useEffect(() => {
     if (project) loadFiles();
   }, [project, loadFiles]);
+
+  useEffect(() => {
+    const normalizedSearch = searchInput.trim();
+    if (normalizedSearch === searchQuery) return;
+
+    const timer = window.setTimeout(() => {
+      resetPagination();
+      setSearchQuery(normalizedSearch);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, searchQuery, resetPagination]);
 
   const openFirebaseConsole = () => {
     if (!project) return;
@@ -200,7 +238,14 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
 
   const navigateToBreadcrumb = (index: number) => {
     const parts = currentPath.split('/').filter(Boolean);
-    setCurrentPath(parts.slice(0, index + 1).join('/'));
+    navigateToPath(parts.slice(0, index + 1).join('/'));
+  };
+
+  const navigateToPath = (path: string) => {
+    setCurrentPath(path);
+    setSearchInput('');
+    setSearchQuery('');
+    resetPagination();
   };
 
   const handleItemClick = (item: StorageItem) => {
@@ -209,8 +254,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
 
   const handleItemDoubleClick = (item: StorageItem) => {
     if (item.type === 'folder') {
-      setCurrentPath(item.path.replace(/\/$/, ''));
-      setSelectedItem(null); // Clear selection when navigating
+      navigateToPath(item.path.replace(/\/$/, ''));
     } else {
       // For files, maybe open get URL dialog or download?
       // For now, let's open the Get URL dialog as a "preview" action
@@ -340,9 +384,25 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
 
   const handleCopy = (text: string) => copyToClipboard(text, () => showMessage?.('Copied to clipboard', 'info'));
   const pathParts = currentPath.split('/').filter(Boolean);
+  const pageOffset = previousPageTokens.length * pageSize;
 
   const handleExpirationChange = (event: SelectChangeEvent<string>) => {
     setUrlExpiration(event.target.value);
+  };
+
+  const handleNextPage = () => {
+    if (!nextPageToken) return;
+    setPreviousPageTokens((tokens) => [...tokens, pageToken || '']);
+    setPageToken(nextPageToken);
+    setSelectedItem(null);
+  };
+
+  const handlePreviousPage = () => {
+    if (previousPageTokens.length === 0) return;
+    const previousToken = previousPageTokens[previousPageTokens.length - 1];
+    setPreviousPageTokens((tokens) => tokens.slice(0, -1));
+    setPageToken(previousToken || undefined);
+    setSelectedItem(null);
   };
 
   if (!project) {
@@ -358,6 +418,27 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
       {/* Toolbar */}
       <Box sx={{ display: 'flex', alignItems: 'center', p: 1, borderBottom: 1, borderColor: 'divider', gap: 1 }}>
         <Chip label={project?.projectId} size="small" sx={{ bgcolor: 'action.selected' }} />
+        <TextField
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder="Search current folder"
+          size="small"
+          sx={{ width: 260 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ fontSize: 18 }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchInput ? (
+              <InputAdornment position="end">
+                <IconButton size="small" aria-label="Clear search" onClick={() => setSearchInput('')}>
+                  <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
         <Box sx={{ flexGrow: 1 }} />
         <Tooltip title="New Folder">
           <IconButton size="small" onClick={() => setCreateFolderOpen(true)}>
@@ -382,7 +463,7 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
           <Link
             component="button"
             underline="hover"
-            onClick={() => setCurrentPath('')}
+            onClick={() => navigateToPath('')}
             sx={{ display: 'flex', alignItems: 'center', color: 'text.primary', cursor: 'pointer' }}
           >
             <HomeIcon sx={{ mr: 0.5, fontSize: 18 }} />
@@ -453,10 +534,12 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
             }}
           >
             <FolderIcon sx={{ fontSize: 64, opacity: 0.3, mb: 2 }} />
-            <Typography>No files in this folder</Typography>
-            <Button variant="outlined" size="small" startIcon={<UploadIcon />} onClick={handleUpload} sx={{ mt: 2 }}>
-              Upload File
-            </Button>
+            <Typography>{searchQuery ? `No items match "${searchQuery}"` : 'No files in this folder'}</Typography>
+            {!searchQuery && (
+              <Button variant="outlined" size="small" startIcon={<UploadIcon />} onClick={handleUpload} sx={{ mt: 2 }}>
+                Upload File
+              </Button>
+            )}
           </Box>
         ) : (
           <TableContainer>
@@ -582,10 +665,46 @@ function StorageTab({ project, addLog, showMessage }: StorageTabProps) {
         }}
       >
         <Typography variant="caption">
-          {items.length} item{items.length !== 1 ? 's' : ''}
+          {items.length > 0 ? `${pageOffset + 1}–${pageOffset + items.length} items` : '0 items'}
           {items.filter((i) => i.type === 'folder').length > 0 &&
             ` (${items.filter((i) => i.type === 'folder').length} folder${items.filter((i) => i.type === 'folder').length !== 1 ? 's' : ''})`}
+          {previousPageTokens.length > 0 && ` · Page ${previousPageTokens.length + 1}`}
+          {nextPageToken && ' · More available'}
         </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Typography variant="caption" sx={{ mr: 1 }}>
+          Rows:
+        </Typography>
+        <Select
+          value={pageSize}
+          size="small"
+          variant="standard"
+          onChange={(event) => {
+            setPageSize(Number(event.target.value));
+            resetPagination();
+          }}
+          sx={{ mr: 1, fontSize: '0.75rem' }}
+        >
+          {[25, 50, 100].map((size) => (
+            <MenuItem key={size} value={size}>
+              {size}
+            </MenuItem>
+          ))}
+        </Select>
+        <Tooltip title="Previous page">
+          <span>
+            <IconButton size="small" onClick={handlePreviousPage} disabled={previousPageTokens.length === 0 || loading}>
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="Next page">
+          <span>
+            <IconButton size="small" onClick={handleNextPage} disabled={!nextPageToken || loading}>
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* Context Menu */}

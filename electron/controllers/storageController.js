@@ -52,6 +52,34 @@ function normalizeStorageItem(item, prefix) {
   };
 }
 
+function getListOptions({ path: storagePath = '', pageToken, pageSize = 50, search = '' }) {
+  const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
+  const normalizedSearch = search.trim().replace(/^\/+/, '');
+  const limit = Math.min(Math.max(Number.parseInt(pageSize, 10) || 50, 1), 1000);
+
+  return {
+    prefix,
+    search: normalizedSearch,
+    pageToken: pageToken || undefined,
+    pageSize: limit,
+  };
+}
+
+function paginateSearchResults(items, search, pageToken, pageSize) {
+  const query = search.toLocaleLowerCase();
+  const filteredItems = [...new Map(items.map((item) => [`${item.type}:${item.path}`, item])).values()].filter((item) =>
+    item.name.toLocaleLowerCase().includes(query),
+  );
+  const tokenMatch = /^search:(\d+)$/.exec(pageToken || '');
+  const offset = tokenMatch ? Number.parseInt(tokenMatch[1], 10) : 0;
+  const nextOffset = offset + pageSize;
+
+  return {
+    items: filteredItems.slice(offset, nextOffset),
+    nextPageToken: nextOffset < filteredItems.length ? `search:${nextOffset}` : null,
+  };
+}
+
 function getProjectId() {
   if (adminRef?.getApps().length > 0) {
     const app = adminRef.getApps()[0];
@@ -62,48 +90,91 @@ function getProjectId() {
 
 function registerHandlers() {
   // List files (Admin SDK / Emulator REST)
-  ipcMain.handle('storage:listFiles', async (event, { path: storagePath = '' }) => {
+  ipcMain.handle('storage:listFiles', async (event, params = {}) => {
     try {
+      const { path: storagePath = '' } = params;
       const projectId = getProjectId();
       if (!projectId) throw new Error('Not connected to Firebase');
       const bucketName = await getBucketName(projectId);
-      const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
+      const { prefix, search, pageToken, pageSize } = getListOptions(params);
 
       if (storageEmulatorHost) {
         const baseUrl = getEmulatorBaseUrl();
-        const url = `${baseUrl}/b/${bucketName}/o?prefix=${encodeURIComponent(prefix)}&delimiter=/`;
-        const response = await fetch(url, {
-          headers: { Authorization: 'Bearer owner' },
-        });
-        const data = await response.json();
-        if (data.error) {
-          return { success: false, error: data.error.message || 'Storage list failed' };
-        }
-        const folders = (data.prefixes || []).map((p) => ({
+        const allPrefixes = [];
+        const allFiles = [];
+        let apiPageToken = search ? undefined : pageToken;
+        let nextPageToken = null;
+
+        do {
+          const query = new URLSearchParams({
+            prefix,
+            delimiter: '/',
+            maxResults: String(search ? 1000 : pageSize),
+          });
+          if (apiPageToken) query.set('pageToken', apiPageToken);
+          const url = `${baseUrl}/b/${bucketName}/o?${query}`;
+          const response = await fetch(url, {
+            headers: { Authorization: 'Bearer owner' },
+          });
+          const data = await response.json();
+          if (data.error) {
+            return { success: false, error: data.error.message || 'Storage list failed' };
+          }
+          allPrefixes.push(...(data.prefixes || []));
+          allFiles.push(...(data.items || []));
+          nextPageToken = data.nextPageToken || null;
+          apiPageToken = nextPageToken || undefined;
+        } while (search && nextPageToken);
+
+        const folders = allPrefixes.map((p) => ({
           name: p.replace(prefix, '').replace(/\/$/, ''),
           path: p,
           type: 'folder',
           size: 0,
           updated: null,
         }));
-        const fileList = (data.items || [])
+        const fileList = allFiles
           .filter((f) => f.name !== prefix && !f.name.endsWith('/'))
           .map((f) => normalizeStorageItem(f, prefix));
-        return { success: true, items: [...folders, ...fileList], currentPath: storagePath };
+        const searchPage = search
+          ? paginateSearchResults([...folders, ...fileList], search, pageToken, pageSize)
+          : null;
+        return {
+          success: true,
+          items: searchPage ? searchPage.items : [...folders, ...fileList],
+          currentPath: storagePath,
+          nextPageToken: searchPage ? searchPage.nextPageToken : nextPageToken,
+        };
       }
 
       const bucket = getStorage().bucket(bucketName);
-      const [files] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
-      const [, , apiResponse] = await bucket.getFiles({ prefix, delimiter: '/', autoPaginate: false });
+      const allFiles = [];
+      const allPrefixes = [];
+      let apiPageToken = search ? undefined : pageToken;
+      let nextPageToken = null;
 
-      const folders = (apiResponse?.prefixes || []).map((p) => ({
+      do {
+        const [files, nextQuery, apiResponse] = await bucket.getFiles({
+          prefix,
+          delimiter: '/',
+          autoPaginate: false,
+          maxResults: search ? 1000 : pageSize,
+          ...(apiPageToken ? { pageToken: apiPageToken } : {}),
+        });
+        allFiles.push(...files);
+        allPrefixes.push(...(apiResponse?.prefixes || []));
+        nextPageToken = apiResponse?.nextPageToken || nextQuery?.pageToken || null;
+        apiPageToken = nextPageToken || undefined;
+      } while (search && nextPageToken);
+
+      const folders = allPrefixes.map((p) => ({
         name: p.replace(prefix, '').replace(/\/$/, ''),
         path: p,
         type: 'folder',
         size: 0,
         updated: null,
       }));
-      const fileList = files
+      const fileList = allFiles
         .filter((f) => f.name !== prefix && !f.name.endsWith('/'))
         .map((f) => ({
           name: f.name.replace(prefix, ''),
@@ -114,7 +185,13 @@ function registerHandlers() {
           updated: f.metadata.updated || null,
           generation: f.metadata.generation,
         }));
-      return { success: true, items: [...folders, ...fileList], currentPath: storagePath };
+      const searchPage = search ? paginateSearchResults([...folders, ...fileList], search, pageToken, pageSize) : null;
+      return {
+        success: true,
+        items: searchPage ? searchPage.items : [...folders, ...fileList],
+        currentPath: storagePath,
+        nextPageToken: searchPage ? searchPage.nextPageToken : nextPageToken,
+      };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -333,33 +410,52 @@ function registerHandlers() {
 
   // ===== Google OAuth Storage Operations =====
 
-  ipcMain.handle('google:storageListFiles', async (event, { projectId, path: storagePath = '' }) => {
+  ipcMain.handle('google:storageListFiles', async (event, params = {}) => {
     try {
+      const { projectId, path: storagePath = '' } = params;
       const accessToken = googleController.getAccessToken();
       if (!accessToken) return { success: false, error: 'Not signed in' };
       const bucketName = await resolveOauthBucket(projectId, accessToken);
-      const prefix = storagePath ? (storagePath.endsWith('/') ? storagePath : storagePath + '/') : '';
-      const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}/o?prefix=${encodeURIComponent(prefix)}&delimiter=/`;
-      const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await response.json();
-      if (data.error) {
-        // Provide clearer error message for bucket not found
-        if (data.error.code === 404) {
-          return {
-            success: false,
-            error: `Storage bucket not found. Make sure Firebase Storage is enabled for project "${projectId}" in the Firebase Console.`,
-          };
+      const { prefix, search, pageToken, pageSize } = getListOptions(params);
+      const allPrefixes = [];
+      const allFiles = [];
+      let apiPageToken = search ? undefined : pageToken;
+      let nextPageToken = null;
+
+      do {
+        const query = new URLSearchParams({
+          prefix,
+          delimiter: '/',
+          maxResults: String(search ? 1000 : pageSize),
+        });
+        if (apiPageToken) query.set('pageToken', apiPageToken);
+        const url = `https://storage.googleapis.com/storage/v1/b/${bucketName}/o?${query}`;
+        const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+        const data = await response.json();
+        if (data.error) {
+          // Provide clearer error message for bucket not found
+          if (data.error.code === 404) {
+            return {
+              success: false,
+              error: `Storage bucket not found. Make sure Firebase Storage is enabled for project "${projectId}" in the Firebase Console.`,
+            };
+          }
+          return { success: false, error: data.error.message };
         }
-        return { success: false, error: data.error.message };
-      }
-      const folders = (data.prefixes || []).map((p) => ({
+        allPrefixes.push(...(data.prefixes || []));
+        allFiles.push(...(data.items || []));
+        nextPageToken = data.nextPageToken || null;
+        apiPageToken = nextPageToken || undefined;
+      } while (search && nextPageToken);
+
+      const folders = allPrefixes.map((p) => ({
         name: p.replace(prefix, '').replace(/\/$/, ''),
         path: p,
         type: 'folder',
         size: 0,
         updated: null,
       }));
-      const files = (data.items || [])
+      const files = allFiles
         .filter((f) => f.name !== prefix && !f.name.endsWith('/'))
         .map((f) => ({
           name: f.name.replace(prefix, ''),
@@ -370,7 +466,14 @@ function registerHandlers() {
           updated: f.updated || null,
           generation: f.generation,
         }));
-      return { success: true, items: [...folders, ...files], currentPath: storagePath, bucketName };
+      const searchPage = search ? paginateSearchResults([...folders, ...files], search, pageToken, pageSize) : null;
+      return {
+        success: true,
+        items: searchPage ? searchPage.items : [...folders, ...files],
+        currentPath: storagePath,
+        bucketName,
+        nextPageToken: searchPage ? searchPage.nextPageToken : nextPageToken,
+      };
     } catch (error) {
       return { success: false, error: error.message };
     }

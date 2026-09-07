@@ -125,6 +125,9 @@ interface JsQueryParams {
 interface StorageListParams {
   projectId?: string;
   path?: string;
+  pageToken?: string;
+  pageSize?: number;
+  search?: string;
 }
 
 interface StorageFileParams {
@@ -132,6 +135,14 @@ interface StorageFileParams {
   storagePath?: string;
   filePath?: string;
   expiresInMs?: number;
+}
+
+interface StorageListResult {
+  success: boolean;
+  files?: StorageFile[];
+  items?: StorageFile[];
+  nextPageToken?: string | null;
+  error?: string;
 }
 
 interface AuthUserParams {
@@ -323,9 +334,7 @@ interface ElectronAPI {
   ) => Promise<{ success: boolean; result?: unknown; documents?: FirestoreDocument[]; error?: string }>;
 
   // Storage
-  storageListFiles: (
-    params: StorageListParams,
-  ) => Promise<{ success: boolean; files?: StorageFile[]; items?: StorageFile[]; error?: string }>;
+  storageListFiles: (params: StorageListParams) => Promise<StorageListResult>;
   storageUploadFile: (
     params: StorageFileParams,
   ) => Promise<{ success: boolean; url?: string; fileName?: string; error?: string }>;
@@ -333,9 +342,7 @@ interface ElectronAPI {
   storageGetDownloadUrl: (params: StorageFileParams) => Promise<{ success: boolean; url?: string; error?: string }>;
 
   // Google OAuth Storage
-  googleStorageListFiles: (
-    params: StorageListParams & { projectId: string },
-  ) => Promise<{ success: boolean; files?: StorageFile[]; items?: StorageFile[]; error?: string }>;
+  googleStorageListFiles: (params: StorageListParams & { projectId: string }) => Promise<StorageListResult>;
   googleStorageUploadFile: (
     params: StorageFileParams & { projectId: string },
   ) => Promise<{ success: boolean; url?: string; fileName?: string; error?: string }>;

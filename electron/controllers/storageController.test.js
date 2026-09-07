@@ -96,6 +96,49 @@ describe('storageController', () => {
     expect(bucketMock).toHaveBeenCalledWith('p1.firebasestorage.app');
   });
 
+  it('listFiles searches filenames by case-insensitive substring across API pages', async () => {
+    resolveAdminBucketMock.mockResolvedValue('p1.firebasestorage.app');
+    const files = [
+      {
+        name: 'docs/invoice.pdf',
+        metadata: { size: '42', contentType: 'application/pdf', updated: '2026-09-07' },
+      },
+    ];
+    const getFilesMock = vi
+      .fn()
+      .mockResolvedValueOnce([
+        files,
+        { pageToken: 'next-token' },
+        { prefixes: ['docs/invoices/'], nextPageToken: 'next-token' },
+      ])
+      .mockResolvedValueOnce([[], null, { prefixes: [] }]);
+    const bucketMock = vi.fn(() => ({ getFiles: getFilesMock }));
+    setAdminRef(adminRefForProject('p1', bucketMock));
+
+    const result = await handlers['storage:listFiles'](null, {
+      path: 'docs',
+      search: 'VOICE',
+      pageSize: 25,
+    });
+
+    expect(getFilesMock).toHaveBeenCalledTimes(2);
+    expect(getFilesMock).toHaveBeenNthCalledWith(1, {
+      prefix: 'docs/',
+      delimiter: '/',
+      autoPaginate: false,
+      maxResults: 1000,
+    });
+    expect(getFilesMock).toHaveBeenNthCalledWith(2, {
+      prefix: 'docs/',
+      delimiter: '/',
+      autoPaginate: false,
+      maxResults: 1000,
+      pageToken: 'next-token',
+    });
+    expect(result.nextPageToken).toBeNull();
+    expect(result.items.map((item) => item.name)).toEqual(['invoices', 'invoice.pdf']);
+  });
+
   it('listFiles surfaces bucket-not-found errors', async () => {
     resolveAdminBucketMock.mockResolvedValue('p1.firebasestorage.app');
     const bucketMock = vi.fn(() => ({
