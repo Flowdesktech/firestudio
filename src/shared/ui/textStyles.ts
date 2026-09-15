@@ -7,3 +7,12 @@ export const singleLineTruncation = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 } as const;
+
+/** Preserves line breaks and wraps even long URLs within the column width. */
+export const wrappedCellText = {
+  display: 'block',
+  minWidth: 0,
+  maxWidth: '100%',
+  whiteSpace: 'pre-wrap',
+  overflowWrap: 'anywhere',
+} as const;

@@ -5,9 +5,10 @@ import CellRenderer from './CellRenderer';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
 import { Document } from '../../store/collectionSlice';
 import { TableThemeColors } from '../../../../app/theme';
-import { singleLineTruncation } from '../../../../shared/ui/textStyles';
+import { singleLineTruncation, wrappedCellText } from '../../../../shared/ui/textStyles';
 
 interface TableRowProps {
+  wrapText: boolean;
   doc: Document; // Firestore document with id and data
   rowIndex: number;
   visibleFields: string[];
@@ -40,6 +41,7 @@ interface TableRowProps {
 }
 
 const TableRow: React.FC<TableRowProps> = ({
+  wrapText,
   doc,
   rowIndex,
   visibleFields,
@@ -117,7 +119,7 @@ const TableRow: React.FC<TableRowProps> = ({
           fontSize: '0.75rem',
           borderBottom: cellBorder,
           borderRight: cellBorder,
-          ...singleLineTruncation,
+          ...(wrapText ? wrappedCellText : singleLineTruncation),
           backgroundColor: rowBg,
           transition: 'background-color 0.1s ease',
         }}
@@ -148,6 +150,7 @@ const TableRow: React.FC<TableRowProps> = ({
 
         return (
           <CellRenderer
+            wrapText={wrapText}
             key={f}
             docId={doc.id}
             field={f}

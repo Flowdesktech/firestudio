@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, useTheme } from '@mui/material';
+import { Box, FormControlLabel, Switch, useTheme } from '@mui/material';
 import { isFirestoreTimestamp, isUnixTimestampMs } from '../../../shared/utils/dateUtils';
 import { FirestoreValue } from '../../../shared/utils/firestoreUtils';
 import { Document } from '../store/collectionSlice';
@@ -51,6 +51,22 @@ const TableView: React.FC<TableViewProps> = ({
   setSelectedRows,
 }) => {
   const theme = useTheme();
+  const [wrapText, setWrapText] = useState(() => {
+    try {
+      return localStorage.getItem('firestudio.table.wrapText') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleWrapTextChange = (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setWrapText(checked);
+    try {
+      localStorage.setItem('firestudio.table.wrapText', String(checked));
+    } catch {
+      // Wrapping remains available when preference storage is unavailable.
+    }
+  };
   const resizingRef = useRef<{ field: string; startX: number; startWidth: number } | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ docId: string; field: string } | null>(null);
 
@@ -237,132 +253,142 @@ const TableView: React.FC<TableViewProps> = ({
   const gridColumns = `40px ${getColWidth('__docId__')}px ${visibleFields.map((f) => `${getColWidth(f)}px`).join(' ')}`;
 
   return (
-    <Box sx={{ flexGrow: 1, overflow: 'auto', position: 'relative', bgcolor: tableColors.rowBg }}>
-      {documents.length > MAX_VISIBLE_ROWS && (
-        <Box
-          sx={{
-            p: 0.5,
-            backgroundColor: theme.palette.warning.main,
-            color: theme.palette.warning.contrastText || '#000',
-            fontSize: '0.75rem',
-            textAlign: 'center',
-            fontWeight: 500,
+    <Box sx={{ flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ px: 1.5, py: 0.25, borderBottom: cellBorder, bgcolor: tableColors.rowBg }}>
+        <FormControlLabel
+          control={<Switch size="small" checked={wrapText} onChange={handleWrapTextChange} />}
+          label="Wrap text"
+          sx={{ m: 0, '& .MuiFormControlLabel-label': { fontSize: '0.8rem' } }}
+        />
+      </Box>
+      <Box sx={{ flexGrow: 1, minHeight: 0, overflow: 'auto', position: 'relative', bgcolor: tableColors.rowBg }}>
+        {documents.length > MAX_VISIBLE_ROWS && (
+          <Box
+            sx={{
+              p: 0.5,
+              backgroundColor: theme.palette.warning.main,
+              color: theme.palette.warning.contrastText || '#000',
+              fontSize: '0.75rem',
+              textAlign: 'center',
+              fontWeight: 500,
+            }}
+          >
+            Showing first {MAX_VISIBLE_ROWS} of {documents.length} rows for performance
+          </Box>
+        )}
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: gridColumns,
+            fontSize: '0.8rem',
+            minWidth: 'max-content',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
-          Showing first {MAX_VISIBLE_ROWS} of {documents.length} rows for performance
-        </Box>
-      )}
+          <TableHeaders
+            visibleFields={visibleFields}
+            allSelected={allSelected}
+            someSelected={someSelected}
+            onSelectAll={handleSelectAll}
+            onResizeStart={handleResizeStart}
+            cellBorder={cellBorder}
+            tableColors={tableColors}
+          />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: gridColumns,
-          fontSize: '0.8rem',
-          minWidth: 'max-content',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <TableHeaders
-          visibleFields={visibleFields}
-          allSelected={allSelected}
-          someSelected={someSelected}
-          onSelectAll={handleSelectAll}
-          onResizeStart={handleResizeStart}
-          cellBorder={cellBorder}
-          tableColors={tableColors}
+          {displayedDocs.map((doc, rowIndex) => (
+            <TableRow
+              wrapText={wrapText}
+              key={doc.id}
+              doc={doc}
+              rowIndex={rowIndex}
+              visibleFields={visibleFields}
+              selectedRows={selectedRows}
+              editingCell={editingCell}
+              selectedCell={selectedCell}
+              editValue={editValue}
+              setEditValue={setEditValue}
+              onSelectRow={handleSelectRow}
+              onCellEdit={handleSelectCell}
+              onCellSave={onCellSave}
+              onCellKeyDown={onCellKeyDown}
+              onCellDoubleClick={handleCellDoubleClick}
+              getType={getType}
+              getTypeColor={getTypeColor}
+              formatValue={formatValue}
+              tableColors={tableColors}
+              cellBorder={cellBorder}
+              setBoolMenuAnchor={setBoolMenuAnchor}
+              setBoolMenuData={setBoolMenuData}
+              setDateMenuAnchor={setDateMenuAnchor}
+              setDateMenuData={setDateMenuData}
+              setTempDateValue={setTempDateValue}
+            />
+          ))}
+        </div>
+
+        {documents.length === 0 && (
+          <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>No documents found</Box>
+        )}
+
+        <EditDialog
+          open={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setSelectedCell(null);
+          }}
+          onSave={handleDialogSave}
+          data={editDialogData}
+          setData={setEditDialogData}
         />
 
-        {displayedDocs.map((doc, rowIndex) => (
-          <TableRow
-            key={doc.id}
-            doc={doc}
-            rowIndex={rowIndex}
-            visibleFields={visibleFields}
-            selectedRows={selectedRows}
-            editingCell={editingCell}
-            selectedCell={selectedCell}
-            editValue={editValue}
-            setEditValue={setEditValue}
-            onSelectRow={handleSelectRow}
-            onCellEdit={handleSelectCell}
-            onCellSave={onCellSave}
-            onCellKeyDown={onCellKeyDown}
-            onCellDoubleClick={handleCellDoubleClick}
-            getType={getType}
-            getTypeColor={getTypeColor}
-            formatValue={formatValue}
-            tableColors={tableColors}
-            cellBorder={cellBorder}
-            setBoolMenuAnchor={setBoolMenuAnchor}
-            setBoolMenuData={setBoolMenuData}
-            setDateMenuAnchor={setDateMenuAnchor}
-            setDateMenuData={setDateMenuData}
-            setTempDateValue={setTempDateValue}
-          />
-        ))}
-      </div>
+        <BooleanPopover
+          anchorEl={boolMenuAnchor}
+          onClose={() => {
+            setBoolMenuAnchor(null);
+            onCellEdit(null, null, null); // Cancel
+          }}
+          onSelect={(val) => {
+            setBoolMenuAnchor(null);
+            onCellSave(boolMenuData.docId, boolMenuData.field, val);
+          }}
+          currentValue={editValue}
+        />
 
-      {documents.length === 0 && (
-        <Box sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>No documents found</Box>
-      )}
+        <DatePopover
+          anchorEl={dateMenuAnchor}
+          onClose={() => {
+            setDateMenuAnchor(null);
+            onCellEdit(null, null, null);
+          }}
+          onSelect={(val) => {
+            let finalValue: FirestoreValue = val;
+            const dateObj = new Date(val);
 
-      <EditDialog
-        open={editDialogOpen}
-        onClose={() => {
-          setEditDialogOpen(false);
-          setSelectedCell(null);
-        }}
-        onSave={handleDialogSave}
-        data={editDialogData}
-        setData={setEditDialogData}
-      />
-
-      <BooleanPopover
-        anchorEl={boolMenuAnchor}
-        onClose={() => {
-          setBoolMenuAnchor(null);
-          onCellEdit(null, null, null); // Cancel
-        }}
-        onSelect={(val) => {
-          setBoolMenuAnchor(null);
-          onCellSave(boolMenuData.docId, boolMenuData.field, val);
-        }}
-        currentValue={editValue}
-      />
-
-      <DatePopover
-        anchorEl={dateMenuAnchor}
-        onClose={() => {
-          setDateMenuAnchor(null);
-          onCellEdit(null, null, null);
-        }}
-        onSelect={(val) => {
-          let finalValue: FirestoreValue = val;
-          const dateObj = new Date(val);
-
-          if (!isNaN(dateObj.getTime())) {
-            const original = dateMenuData.originalValue;
-            if (isFirestoreTimestamp(original)) {
-              const seconds = Math.floor(dateObj.getTime() / 1000);
-              const nanoseconds = (dateObj.getTime() % 1000) * 1000000;
-              if (original._seconds !== undefined) {
-                finalValue = { _seconds: seconds, _nanoseconds: nanoseconds };
-              } else {
-                finalValue = { seconds: seconds, nanoseconds: nanoseconds };
+            if (!isNaN(dateObj.getTime())) {
+              const original = dateMenuData.originalValue;
+              if (isFirestoreTimestamp(original)) {
+                const seconds = Math.floor(dateObj.getTime() / 1000);
+                const nanoseconds = (dateObj.getTime() % 1000) * 1000000;
+                if (original._seconds !== undefined) {
+                  finalValue = { _seconds: seconds, _nanoseconds: nanoseconds };
+                } else {
+                  finalValue = { seconds: seconds, nanoseconds: nanoseconds };
+                }
+              } else if (isUnixTimestampMs(original)) {
+                finalValue = dateObj.getTime();
+              } else if (original instanceof Date) {
+                finalValue = dateObj;
               }
-            } else if (isUnixTimestampMs(original)) {
-              finalValue = dateObj.getTime();
-            } else if (original instanceof Date) {
-              finalValue = dateObj;
             }
-          }
 
-          setDateMenuAnchor(null);
-          onCellSave(dateMenuData.docId, dateMenuData.field, finalValue);
-        }}
-        initialValue={tempDateValue}
-        originalValue={dateMenuData.originalValue}
-      />
+            setDateMenuAnchor(null);
+            onCellSave(dateMenuData.docId, dateMenuData.field, finalValue);
+          }}
+          initialValue={tempDateValue}
+          originalValue={dateMenuData.originalValue}
+        />
+      </Box>
     </Box>
   );
 };
