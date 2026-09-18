@@ -224,3 +224,22 @@ export const createDefaultSortConfig = (): SortConfig => ({
   field: '',
   direction: 'asc',
 });
+
+/**
+ * Normalizes a Firestore collection or document path entered by the user.
+ * Returns null when the path contains an empty segment.
+ */
+export const normalizeFirestorePath = (path: string): string | null => {
+  const normalizedPath = path.trim().replace(/^\/+|\/+$/g, '');
+  if (!normalizedPath || normalizedPath.split('/').some((segment) => !segment)) return null;
+  return normalizedPath;
+};
+
+/** Decides whether a Simple Query should refresh the current tab or open the entered path. */
+export const resolveSimpleQueryPath = (
+  inputPath: string,
+  currentPath: string,
+): { path: string; shouldOpenPath: boolean } | null => {
+  const path = normalizeFirestorePath(inputPath);
+  return path ? { path, shouldOpenPath: path !== currentPath } : null;
+};
