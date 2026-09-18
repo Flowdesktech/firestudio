@@ -62,6 +62,7 @@ import {
   getVisibleFields,
   documentsToJson,
   getErrorMessage,
+  resolveSimpleQueryPath,
 } from '../../../shared/utils';
 import { generateJsQueryFromSimpleParams } from '../../../shared/utils/queryUtils';
 
@@ -425,23 +426,6 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     }
   }, [viewMode, documents]);
 
-  // F5 keyboard shortcut
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F5') {
-        e.preventDefault();
-        if (queryModeRef.current === 'js') {
-          executeJsQuery();
-        } else {
-          loadDocuments();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [executeJsQuery, loadDocuments]);
-
   // Computed values
   const allFields = useMemo(() => extractAllFields(documents), [documents]);
   const queryFields = useMemo(() => extractQueryableFields(documents), [documents]);
@@ -460,26 +444,52 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   );
 
   // Event Handlers
-  const handleRunQuery = useCallback(async () => {
-    if (queryMode === 'simple') {
-      await loadDocuments();
-    } else {
-      await executeJsQuery();
-    }
-  }, [queryMode, loadDocuments, executeJsQuery]);
-
-  const handleOpenCollectionPath = useCallback(() => {
-    const nextPath = collectionPathInput.trim().replace(/^\/+|\/+$/g, '');
-    const segments = nextPath.split('/');
-
-    if (!nextPath || segments.some((segment) => !segment)) {
+  const handleSimpleQuery = useCallback(async () => {
+    const queryPath = resolveSimpleQueryPath(collectionPathInput, documentPath || collectionPath);
+    if (!queryPath) {
       showMessage?.('Enter a valid Firestore collection or document path.', 'error');
       return;
     }
 
-    if (nextPath === (documentPath || collectionPath)) return;
-    onOpenCollection?.(nextPath, firestoreDatabaseId);
-  }, [collectionPathInput, collectionPath, documentPath, firestoreDatabaseId, onOpenCollection, showMessage]);
+    if (queryPath.shouldOpenPath) {
+      onOpenCollection?.(queryPath.path, firestoreDatabaseId);
+      return;
+    }
+
+    await loadDocuments();
+  }, [
+    collectionPathInput,
+    collectionPath,
+    documentPath,
+    firestoreDatabaseId,
+    loadDocuments,
+    onOpenCollection,
+    showMessage,
+  ]);
+
+  const handleRunQuery = useCallback(async () => {
+    if (queryMode === 'simple') {
+      await handleSimpleQuery();
+    } else {
+      await executeJsQuery();
+    }
+  }, [queryMode, handleSimpleQuery, executeJsQuery]);
+
+  // F5 follows the same behavior as the Run button, including the edited Simple Query path.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'F5') return;
+      event.preventDefault();
+      if (queryModeRef.current === 'js') {
+        void executeJsQuery();
+      } else {
+        void handleSimpleQuery();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [executeJsQuery, handleSimpleQuery]);
 
   const handleToggleFavorite = useCallback(() => {
     dispatch(
@@ -757,7 +767,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                handleOpenCollectionPath();
+                void handleSimpleQuery();
               }
             }}
             placeholder="Collection path"
