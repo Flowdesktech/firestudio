@@ -22,6 +22,7 @@ interface TreeViewProps {
   ) => void;
   onCellSave: () => void;
   onCellKeyDown: (e: React.KeyboardEvent) => void;
+  onAddField: (docId: string, parentPath: string, docData: DocumentData, docCollectionPath?: string) => void;
   getType: (value: FirestoreValue) => string;
   getTypeColor: (type: string, isDark: boolean) => string;
   formatValue: (value: FirestoreValue, type: string) => string;
@@ -43,6 +44,7 @@ const TreeView: React.FC<TreeViewProps> = ({
   onCellEdit,
   onCellSave,
   onCellKeyDown,
+  onAddField,
   getType,
   getTypeColor,
   formatValue,
@@ -121,6 +123,7 @@ const TreeView: React.FC<TreeViewProps> = ({
       onCellEdit,
       onCellSave,
       onCellKeyDown,
+      onAddField,
       getType,
       getTypeColor,
       formatValue,
@@ -142,6 +145,7 @@ const TreeView: React.FC<TreeViewProps> = ({
       onCellEdit,
       onCellSave,
       onCellKeyDown,
+      onAddField,
       getType,
       getTypeColor,
       formatValue,

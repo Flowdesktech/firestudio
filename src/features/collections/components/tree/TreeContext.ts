@@ -28,6 +28,7 @@ export interface TreeContextValue {
   ) => void;
   onCellSave: () => void;
   onCellKeyDown: (e: React.KeyboardEvent) => void;
+  onAddField: (docId: string, parentPath: string, docData: DocumentData, docCollectionPath?: string) => void;
   getType: (value: FirestoreValue) => string;
   getTypeColor: (type: string, isDark: boolean) => string;
   formatValue: (value: FirestoreValue, type: string) => string;

@@ -112,6 +112,47 @@ export const documentService = {
     const transformedValue = this.transformValueForSave(oldValue as FirestoreValue, newValue);
     return { ...doc.data, [field]: transformedValue };
   },
+
+  /**
+   * Prepare document data with a new field added at a nested dot-path.
+   * @param docData - Current document fields
+   * @param parentPath - Dot-path of the parent object relative to the doc ("" for doc root)
+   * @param fieldName - New field name (single segment, no dots)
+   * @param value - Value for the new field
+   * @returns { data } on success or { error } describing why the add was rejected
+   */
+  prepareAddData(
+    docData: Record<string, FirestoreValue>,
+    parentPath: string,
+    fieldName: string,
+    value: FirestoreValue,
+  ): { data: Record<string, FirestoreValue> } | { error: string } {
+    const name = fieldName.trim();
+    if (!name) return { error: 'Field name is required' };
+    if (name.includes('.')) return { error: 'Field name cannot contain dots' };
+
+    let cloned: Record<string, FirestoreValue>;
+    try {
+      cloned = JSON.parse(JSON.stringify(docData ?? {})) as Record<string, FirestoreValue>;
+    } catch {
+      return { error: 'Document data is not plain serializable data' };
+    }
+
+    let parent: unknown = cloned;
+    if (parentPath) {
+      for (const segment of parentPath.split('.')) {
+        if (Array.isArray(parent)) return { error: 'Cannot add fields inside an Array' };
+        if (parent === null || typeof parent !== 'object') return { error: 'Parent path does not exist' };
+        parent = (parent as Record<string, FirestoreValue>)[segment];
+      }
+    }
+    if (Array.isArray(parent)) return { error: 'Cannot add fields inside an Array' };
+    if (parent === null || typeof parent !== 'object') return { error: 'Parent path does not exist' };
+    const parentObj = parent as Record<string, FirestoreValue>;
+    if (Object.prototype.hasOwnProperty.call(parentObj, name)) return { error: 'Field already exists' };
+    parentObj[name] = value;
+    return { data: cloned };
+  },
 };
 
 export default documentService;
