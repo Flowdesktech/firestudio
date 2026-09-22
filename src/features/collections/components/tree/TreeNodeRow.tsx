@@ -1,10 +1,23 @@
-import React, { useContext, useEffect } from 'react';
-import { Box, IconButton, TableCell, TableRow, TextField, Typography } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  TableCell,
+  TableRow,
+  TextField,
+  Typography,
+} from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   Storage as CollectionIcon,
   Description as DocumentIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from '@mui/icons-material';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
 import {
@@ -15,6 +28,7 @@ import {
 import { DocumentData } from '../../store/collectionSlice';
 import { TreeContext } from './TreeContext';
 import { singleLineTruncation } from '../../../../shared/ui/textStyles';
+import { MONOSPACE_FONT_FAMILY } from '../../../../shared/utils/constants';
 
 interface TreeNodeRowProps {
   nodeKey: string;
@@ -27,6 +41,12 @@ interface TreeNodeRowProps {
   isDoc?: boolean;
   isCollection?: boolean;
   missing?: boolean;
+  /**
+   * Document-relative dot path of this field (e.g. "profile.displayName").
+   * Omitted for documents, collections and array elements — those are not
+   * deletable fields, and their presence disables the delete affordance.
+   */
+  fieldPath?: string;
 }
 
 const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
@@ -40,6 +60,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   isDoc = false,
   isCollection = false,
   missing = false,
+  fieldPath,
 }) => {
   const ctx = useContext(TreeContext);
   if (!ctx) throw new Error('TreeNodeRow must be rendered inside a TreeContext provider');
@@ -54,6 +75,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
     onCellEdit,
     onCellSave,
     onCellKeyDown,
+    onDeleteField,
     getType,
     getTypeColor,
     formatValue,
@@ -66,6 +88,9 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
 
   const nodeType = isCollection ? 'Collection' : isDoc ? 'Document' : getType(value);
   const isExpandable = isCollection || isDoc || nodeType === 'Array' || nodeType === 'Map';
+  // Only real fields (top-level keys and map keys) are deletable. `fieldPath` is
+  // deliberately omitted for documents, collections and array elements.
+  const canDeleteField = Boolean(fieldPath && docId && docData && !isDoc && !isCollection);
   const isExpanded = expandedNodes[path];
   const displayValue = isExpandable ? '' : formatValue(value, nodeType);
   const isEditing =
@@ -78,6 +103,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   const isDateLike = nodeType === 'Timestamp' || isFirestoreTimestamp(value) || isUnixTimestampMs(value);
 
   const [dateValue, setDateValue] = React.useState('');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (isEditing && isDateLike) {
@@ -100,7 +126,9 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
 
   return (
     <>
-      <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+      <TableRow
+        sx={{ '&:hover': { bgcolor: 'action.hover' }, '&:hover .tree-delete-field': { visibility: 'visible' } }}
+      >
         <TableCell
           sx={{
             py: 0.25,
@@ -204,12 +232,32 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
           )}
         </TableCell>
         <TableCell sx={{ py: 0.25, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography
-            title={nodeType}
-            sx={{ ...singleLineTruncation, fontSize: '0.75rem', color: getTypeColor(nodeType, isDark) }}
-          >
-            {nodeType}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography
+              title={nodeType}
+              sx={{ ...singleLineTruncation, flex: 1, fontSize: '0.75rem', color: getTypeColor(nodeType, isDark) }}
+            >
+              {nodeType}
+            </Typography>
+            {/* Fixed-width slot so the row does not shift when the button appears on hover. */}
+            <Box sx={{ width: 20, height: 20, flexShrink: 0 }}>
+              {canDeleteField && (
+                <IconButton
+                  size="small"
+                  className="tree-delete-field"
+                  aria-label={`Delete field ${fieldPath}`}
+                  title={`Delete field ${fieldPath}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (fieldPath) setPendingDelete(fieldPath);
+                  }}
+                  sx={{ p: 0.25, width: 20, height: 20, visibility: 'hidden', color: 'error.main' }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              )}
+            </Box>
+          </Box>
         </TableCell>
       </TableRow>
 
@@ -254,6 +302,9 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
                 docData={docData}
                 docCollectionPath={docCollectionPath}
                 depth={depth + 1}
+                // Array children are index elements, not fields: deleting one would
+                // be a splice, so they get no fieldPath and no delete affordance.
+                fieldPath={fieldPath && !Array.isArray(value) ? `${fieldPath}.${k}` : undefined}
               />
             ))}
 
@@ -271,6 +322,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
                     docData={docData}
                     docCollectionPath={docCollectionPath}
                     depth={depth + 1}
+                    fieldPath={k}
                   />
                 ))}
               {(subcollectionIds ?? []).map((id) => (
@@ -287,6 +339,40 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
           )}
         </>
       )}
+
+      <Dialog open={Boolean(pendingDelete)} onClose={() => setPendingDelete(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete field?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            This permanently removes the field{' '}
+            <Box component="span" sx={{ fontFamily: MONOSPACE_FONT_FAMILY, fontWeight: 600 }}>
+              {pendingDelete}
+            </Box>{' '}
+            from document{' '}
+            <Box component="span" sx={{ fontFamily: MONOSPACE_FONT_FAMILY, fontWeight: 600 }}>
+              {docId}
+            </Box>
+            . This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDelete(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disableElevation
+            onClick={() => {
+              const toDelete = pendingDelete;
+              setPendingDelete(null);
+              if (toDelete && docId && docData) {
+                onDeleteField(docId, toDelete, docData, docCollectionPath);
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

@@ -114,24 +114,24 @@ change.
       (no-op), non-Map intermediate (no-op), input not mutated.
 - [x] Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`
 - [x] Commit: `feat(collections): add field-path removal to document service`
-- [ ] Commit id: _(record after commit)_
+- [x] Commit id: `9044a77`
 
 ### TD-2 — Tree view delete affordance + wiring
 
-- [ ] Thread a document-relative `fieldPath` through `TreeNodeRow` / `TreeContext`
+- [x] Thread a document-relative `fieldPath` through `TreeNodeRow` / `TreeContext`
       (root fields get the key; nested fields get `parent.field`). Do not change the
       existing `field`/`nodeKey` used by edit.
-- [ ] Add `onDeleteField(docId, fieldPath, docData, docCollectionPath)` to
+- [x] Add `onDeleteField(docId, fieldPath, docData, docCollectionPath)` to
       `TreeContextValue`, provided by `TreeView`.
-- [ ] In `TreeNodeRow`, show a small delete icon on hover for field nodes only:
+- [x] In `TreeNodeRow`, show a small delete icon on hover for field nodes only:
       not `isDoc`, not `isCollection`, not array-element nodes. Keep the row dense;
       the icon must not shift layout when it appears.
-- [ ] Confirmation dialog naming the document id and the field path, with explicit
+- [x] Confirmation dialog naming the document id and the field path, with explicit
       Cancel / Delete actions. English copy.
-- [ ] Implement the handler in `CollectionTab`: `prepareDeleteData` then dispatch
+- [x] Implement the handler in `CollectionTab`: `prepareDeleteData` then dispatch
       `updateDocument`, then refresh/notify via the existing message path.
-- [ ] Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`
-- [ ] Commit: `feat(collections): allow deleting fields from documents in tree view`
+- [x] Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`
+- [x] Commit: `feat(collections): allow deleting fields from documents in tree view`
 - [ ] Commit id: _(record after commit)_
 
 ## Authorized scope notes for implementer
@@ -142,19 +142,19 @@ Rollback boundary per commit is the files named in that task only.
 
 ## Progress
 
-| Task | Status             | Evidence                                                |
-| ---- | ------------------ | ------------------------------------------------------- |
-| TD-1 | done (uncommitted) | `prepareDeleteData` + 7 unit tests written and verified |
-| TD-2 | pending            | —                                                       |
+| Task | Status             | Evidence                                    |
+| ---- | ------------------ | ------------------------------------------- |
+| TD-1 | done               | commit `9044a77`                            |
+| TD-2 | done (uncommitted) | 4 files, 137+/9-; verified, awaiting commit |
 
 ## Verification evidence
 
-### TD-1
+### TD-1 — commit `9044a77`
 
 - `pnpm test`: 96 passed (13 files) — includes `documentService.test.ts`, 7 tests
 - `pnpm typecheck`: clean, no output
 - `pnpm lint` (scoped to changed files): `ESLint: No issues found`
-- `pnpm lint` (full script): 1 pre-existing error in `src/**/firebaseController.js`
+- `pnpm lint` (full script): 1 pre-existing error in `firebaseController.js`
   (`no-unused-vars`). File is untouched by this change — known environmental
   failure, not introduced here.
 - Runtime harness: N/A (Electron desktop UI; no runtime boundary exercised)
@@ -162,6 +162,27 @@ Rollback boundary per commit is the files named in that task only.
 Rollback boundary TD-1: `src/features/collections/services/documentService.ts`,
 `src/features/collections/services/documentService.test.ts`.
 
+### TD-2
+
+- `pnpm test`: 96 passed (13 files)
+- `pnpm typecheck`: clean, no output
+- `pnpm lint` (scoped to 4 changed files): `ESLint: No issues found`
+- `pnpm lint` (full script): 1 pre-existing error in `firebaseController.js`
+  (same known environmental failure as TD-1)
+- Runtime harness: N/A (Electron desktop UI; no runtime boundary exercised)
+
+Array-element vs Map-key distinction: `TreeNodeRow`'s nested recursion passes
+`fieldPath` only when `!Array.isArray(value)`. Array children are index elements
+and get no `fieldPath`, which is what disables their delete affordance. This
+matches `prepareDeleteData`, whose non-Map-intermediate rule already rejects
+`tags.0`-style paths.
+
+Rollback boundary TD-2: `src/features/collections/components/CollectionTab.tsx`,
+`src/features/collections/components/TreeView.tsx`,
+`src/features/collections/components/tree/TreeContext.ts`,
+`src/features/collections/components/tree/TreeNodeRow.tsx`.
+
 ## Next step
 
-Commit TD-1, then run TD-2.
+Commit TD-2, then run the deferred native review for the PR slice (risk was
+`medium`, deferred to slice close).
