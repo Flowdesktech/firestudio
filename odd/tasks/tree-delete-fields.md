@@ -66,10 +66,15 @@ ship with unit tests covering nested and top-level paths.
 
 ## Delivery strategy
 
-- **Strategy**: `single-pr`
-- **Forecast**: ~185 authored changed lines (additions + deletions, generated excluded) — under the 400-line budget
-- **Chain strategy**: not needed (no chained PRs)
-- **Slice boundaries**: one PR holding TD-1 and TD-2
+- **Strategy**: `exception-ok` (maintainer-approved `size:exception`)
+- **Forecast at creation**: ~185 authored changed lines — under the 400-line budget
+- **Actual running count** from boundary `34923d6`: **421** (411+/10-) — over budget
+- **Breakdown**: `odd/tasks/tree-delete-fields.md` 188 (this planning document) +
+  product code/tests 233
+- **Per commit**: `9044a77` = 252, `12469d2` = 197 — both individually under 400
+- **Chain strategy**: none — maintainer accepted `size:exception` for a single PR
+  instead of a chained split (2026-09-22)
+- **Slice boundaries**: one PR holding `9044a77` and `12469d2`
 
 ## Known pre-existing limitation (out of scope, follow-up candidate)
 
@@ -132,7 +137,7 @@ change.
       `updateDocument`, then refresh/notify via the existing message path.
 - [x] Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`
 - [x] Commit: `feat(collections): allow deleting fields from documents in tree view`
-- [ ] Commit id: _(record after commit)_
+- [x] Commit id: `12469d2`
 
 ## Authorized scope notes for implementer
 
@@ -142,10 +147,10 @@ Rollback boundary per commit is the files named in that task only.
 
 ## Progress
 
-| Task | Status             | Evidence                                    |
-| ---- | ------------------ | ------------------------------------------- |
-| TD-1 | done               | commit `9044a77`                            |
-| TD-2 | done (uncommitted) | 4 files, 137+/9-; verified, awaiting commit |
+| Task | Status | Evidence         |
+| ---- | ------ | ---------------- |
+| TD-1 | done   | commit `9044a77` |
+| TD-2 | done   | commit `12469d2` |
 
 ## Verification evidence
 
@@ -184,5 +189,6 @@ Rollback boundary TD-2: `src/features/collections/components/CollectionTab.tsx`,
 
 ## Next step
 
-Commit TD-2, then run the deferred native review for the PR slice (risk was
-`medium`, deferred to slice close).
+Run the deferred native review for the PR slice. Risk was assessed `medium`
+(`executable_change` on the test file) and deferred to slice close; the feature is
+complete, so the preflight STATUS runs now with `--base-ref 34923d6 --committed-only`.
