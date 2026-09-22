@@ -36,10 +36,20 @@ require_.cache[require_.resolve('firebase-admin/firestore')] = {
   exports: {
     FieldValue: { serverTimestamp: vi.fn() },
     Filter: { where: vi.fn() },
-    Timestamp: { now: vi.fn() },
-    GeoPoint: vi.fn(),
+    Timestamp: vi.fn(function (seconds, nanoseconds) {
+      this.seconds = seconds;
+      this.nanoseconds = nanoseconds;
+    }),
+    GeoPoint: vi.fn(function (latitude, longitude) {
+      this.latitude = latitude;
+      this.longitude = longitude;
+    }),
   },
 };
+
+const firestoreMock = require_('firebase-admin/firestore');
+const electronMock = require_('electron');
+const fsMock = require_('fs');
 
 // Load controller with mocked deps
 const controllerPath = require_.resolve('./firestoreController');
@@ -294,5 +304,93 @@ describe('firestoreController', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Not connected');
+  });
+
+  // ─── admin write paths convert app-shaped values ─────────────────────────
+
+  const appShapedData = () => ({
+    name: 'test',
+    count: 3,
+    active: true,
+    createdAt: { _seconds: 1767225600, _nanoseconds: 500 },
+    location: { _latitude: 1.5, _longitude: -2.5 },
+    tags: [{ _seconds: 10, _nanoseconds: 0 }, 'plain'],
+    meta: { nested: { _seconds: 20, _nanoseconds: 1 } },
+  });
+
+  const convertedData = () => ({
+    name: 'test',
+    count: 3,
+    active: true,
+    createdAt: { seconds: 1767225600, nanoseconds: 500 },
+    location: { latitude: 1.5, longitude: -2.5 },
+    tags: [{ seconds: 10, nanoseconds: 0 }, 'plain'],
+    meta: { nested: { seconds: 20, nanoseconds: 1 } },
+  });
+
+  it('setDocument converts timestamps and geopoints before writing', async () => {
+    const set = vi.fn().mockResolvedValue(undefined);
+    setRefs(null, { doc: vi.fn().mockReturnValue({ set }) });
+    const data = appShapedData();
+
+    const result = await handlers['firestore:setDocument'](null, { documentPath: 'col/doc', data });
+
+    expect(result.success).toBe(true);
+    expect(firestoreMock.Timestamp).toHaveBeenCalled();
+    expect(firestoreMock.GeoPoint).toHaveBeenCalled();
+    expect(set.mock.calls[0][0]).toEqual(convertedData());
+    // The incoming payload must not be mutated.
+    expect(data.createdAt).toEqual({ _seconds: 1767225600, _nanoseconds: 500 });
+    expect(data.location).toEqual({ _latitude: 1.5, _longitude: -2.5 });
+  });
+
+  it('updateDocument converts timestamps and geopoints before writing', async () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    setRefs(null, { doc: vi.fn().mockReturnValue({ update }) });
+    const data = appShapedData();
+
+    const result = await handlers['firestore:updateDocument'](null, { documentPath: 'col/doc', data });
+
+    expect(result.success).toBe(true);
+    expect(update.mock.calls[0][0]).toEqual(convertedData());
+    expect(data.createdAt).toEqual({ _seconds: 1767225600, _nanoseconds: 500 });
+  });
+
+  it('createDocument converts timestamps and geopoints before writing', async () => {
+    const set = vi.fn().mockResolvedValue(undefined);
+    const docRef = { id: 'new-id', set };
+    const mockCollection = { doc: vi.fn().mockReturnValue(docRef) };
+    setRefs(null, { collection: vi.fn().mockReturnValue(mockCollection) });
+    const data = appShapedData();
+
+    const result = await handlers['firestore:createDocument'](null, {
+      collectionPath: 'col',
+      documentId: 'new-id',
+      data,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.documentId).toBe('new-id');
+    expect(set.mock.calls[0][0]).toEqual(convertedData());
+  });
+
+  it('importDocuments converts timestamps and geopoints for each batch set', async () => {
+    const batchSet = vi.fn();
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const doc = vi.fn().mockReturnValue({});
+    setRefs(null, {
+      collection: vi.fn().mockReturnValue({ doc }),
+      batch: vi.fn().mockReturnValue({ set: batchSet, commit }),
+    });
+    electronMock.dialog.showOpenDialog.mockResolvedValue({ filePaths: ['/tmp/import.json'] });
+    fsMock.readFileSync.mockReturnValue(JSON.stringify({ doc1: appShapedData(), doc2: { plain: 'value' } }));
+
+    const result = await handlers['firestore:importDocuments'](null, 'col');
+
+    expect(result.success).toBe(true);
+    expect(result.count).toBe(2);
+    expect(batchSet.mock.calls[0][1]).toEqual(convertedData());
+    expect(batchSet.mock.calls[1][1]).toEqual({ plain: 'value' });
+    expect(commit).toHaveBeenCalled();
   });
 });

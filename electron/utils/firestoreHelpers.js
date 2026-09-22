@@ -43,6 +43,57 @@ function convertToFirestoreValue(value) {
 }
 
 /**
+ * Converts app-shaped data into firebase-admin compatible values.
+ * The UI works with `{ _seconds, _nanoseconds }` timestamps and
+ * `{ _latitude, _longitude }` geopoints; the Admin SDK needs real
+ * Timestamp/GeoPoint instances, otherwise it persists them as plain maps.
+ * Constructors are injected so this module stays free of firebase-admin.
+ * @param {*} value - App-shaped value to convert
+ * @param {Object} opts - { Timestamp, GeoPoint, FieldValue } constructors
+ * @returns {*} - Value safe to hand to the firebase-admin SDK
+ */
+function toFirestoreAdminValue(value, { Timestamp, GeoPoint, FieldValue } = {}) {
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return new Timestamp(Math.floor(time / 1000), (time % 1000) * 1000000);
+  }
+  if (typeof value !== 'object') return value;
+
+  // Sentinels (serverTimestamp, delete, increment, ...) must pass through.
+  if (typeof FieldValue === 'function' && value instanceof FieldValue) return value;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toFirestoreAdminValue(item, { Timestamp, GeoPoint, FieldValue }));
+  }
+
+  // Timestamp shapes: { _seconds, _nanoseconds } or { seconds, nanoseconds }.
+  const nanos = value._nanoseconds ?? value.nanoseconds ?? value.nanos;
+  const underscoredSeconds = typeof value._seconds === 'number' ? value._seconds : undefined;
+  const plainSeconds = typeof value.seconds === 'number' ? value.seconds : undefined;
+  if (underscoredSeconds !== undefined || (plainSeconds !== undefined && nanos !== undefined)) {
+    const seconds = underscoredSeconds !== undefined ? underscoredSeconds : plainSeconds;
+    return new Timestamp(seconds, nanos || 0);
+  }
+
+  // GeoPoint shapes: { _latitude, _longitude } or { latitude, longitude }.
+  const underscoredLatLng = value._latitude !== undefined && value._longitude !== undefined;
+  const plainLatLng = value.latitude !== undefined && value.longitude !== undefined;
+  if (underscoredLatLng || plainLatLng) {
+    const latitude = underscoredLatLng ? value._latitude : value.latitude;
+    const longitude = underscoredLatLng ? value._longitude : value.longitude;
+    return new GeoPoint(latitude, longitude);
+  }
+
+  // Plain map: rebuild recursively, never mutate the input.
+  const result = {};
+  for (const [key, item] of Object.entries(value)) {
+    result[key] = toFirestoreAdminValue(item, { Timestamp, GeoPoint, FieldValue });
+  }
+  return result;
+}
+
+/**
  * Parses a Firestore REST API value to JS value
  * @param {Object} value - Firestore REST API value object
  * @returns {*} - JavaScript value
@@ -118,6 +169,7 @@ function firestoreDocumentToData(doc) {
 
 module.exports = {
   convertToFirestoreValue,
+  toFirestoreAdminValue,
   parseFirestoreValue,
   parseFirestoreDocument,
   dataToFirestoreFields,
