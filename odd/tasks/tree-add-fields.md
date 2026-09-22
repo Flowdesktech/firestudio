@@ -37,7 +37,7 @@ JSON permite agregar pero no es intuitivo; Table solo edita top-level. Tree mode
 ## Verification evidence
 
 - TD-1 (commit 3623546): `pnpm typecheck` clean; `pnpm test` 12 files / 89 tests passed; scoped lint + prettier check on AddFieldDialog clean.
-- TD-3 / TD-2 checks: `pnpm typecheck` clean; `pnpm test` 12 files / 89 tests passed; scoped lint + prettier check on CollectionTab, TreeView, TreeNodeRow, TreeContext, documentService, AddFieldDialog clean.
+- TD-2 (commit a22afac): `pnpm typecheck` clean; `pnpm test` 12 files / 89 tests passed; scoped lint + prettier check on CollectionTab, TreeView, TreeNodeRow, TreeContext, documentService clean.
 
 ## Next step
 
