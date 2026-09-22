@@ -121,7 +121,14 @@ const AddFieldDialog: React.FC<AddFieldDialogProps> = ({ open, parentPathLabel, 
     return '';
   })();
 
-  const isValid = !nameError && !jsonError && !geoError && !numberError;
+  const timestampError = (() => {
+    if (fieldType !== 'Timestamp') return '';
+    if (timestampValue.trim() === '' || isNaN(new Date(timestampValue).getTime()))
+      return 'Must be a valid date and time';
+    return '';
+  })();
+
+  const isValid = !nameError && !jsonError && !geoError && !numberError && !timestampError;
 
   const buildValue = (): FirestoreValue => {
     switch (fieldType) {
@@ -270,6 +277,8 @@ const AddFieldDialog: React.FC<AddFieldDialogProps> = ({ open, parentPathLabel, 
             onChange={(e) => setTimestampValue(e.target.value)}
             onKeyDown={handleKeyDown}
             InputLabelProps={{ shrink: true }}
+            error={Boolean(timestampError)}
+            helperText={timestampError || undefined}
             sx={{
               mt: 2,
               '& .MuiInputBase-input': { fontFamily: MONOSPACE_FONT_FAMILY, fontSize: '0.9rem' },
