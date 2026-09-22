@@ -64,6 +64,7 @@ import {
   getErrorMessage,
 } from '../../../shared/utils';
 import { generateJsQueryFromSimpleParams } from '../../../shared/utils/queryUtils';
+import { documentService } from '../services/documentService';
 
 // Sub-components
 import QueryBar from './QueryBar';
@@ -611,6 +612,39 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     [handleCellSave],
   );
 
+  // Delete a field from a document. Reuses `updateDocument`, which writes the whole
+  // document data object, so omitting the key removes it from Firestore.
+  const handleDeleteField = useCallback(
+    async (docId: string, fieldPath: string, docData: DocumentData, docCollectionPath?: string) => {
+      // Subcollection documents live at their own collection path; root docs keep the tab's path
+      const targetCollectionPath = docCollectionPath ?? collectionPath;
+      const source: DocumentData | undefined =
+        docData && typeof docData === 'object' ? docData : documents.find((d) => d.id === docId)?.data;
+      if (!source) return;
+
+      const newData = documentService.prepareDeleteData({ id: docId, data: source }, fieldPath);
+
+      try {
+        await dispatch(
+          updateDocument({
+            project,
+            collection: targetCollectionPath,
+            docId,
+            docData: newData,
+            firestoreDatabaseId,
+          }),
+        ).unwrap();
+        showMessage?.(`Deleted field ${fieldPath} from document ${docId}`, 'success');
+        if (targetCollectionPath !== collectionPath) {
+          refreshDocuments(targetCollectionPath);
+        }
+      } catch (error) {
+        showError(error);
+      }
+    },
+    [documents, dispatch, project, collectionPath, firestoreDatabaseId, refreshDocuments, showMessage, showError],
+  );
+
   // JSON Save Handler
   const handleJsonSave = useCallback(async () => {
     try {
@@ -859,6 +893,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
                   handleCellSave();
                 }} // Explicitly call handleCellSave
                 onCellKeyDown={handleCellKeyDown}
+                onDeleteField={handleDeleteField}
                 getType={getType}
                 getTypeColor={getColor}
                 formatValue={formatValue}
