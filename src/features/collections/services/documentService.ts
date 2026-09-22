@@ -4,7 +4,11 @@
  * Extracted from CollectionTab.jsx
  */
 
-import { FirestoreValue, FirestoreTimestamp as SharedFirestoreTimestamp } from '../../../shared/utils/firestoreUtils';
+import {
+  FirestoreValue,
+  FirestoreTimestamp as SharedFirestoreTimestamp,
+  getValueType,
+} from '../../../shared/utils/firestoreUtils';
 
 interface FirestoreTimestamp {
   _seconds: number;
@@ -111,6 +115,31 @@ export const documentService = {
     const oldValue = doc.data?.[field];
     const transformedValue = this.transformValueForSave(oldValue as FirestoreValue, newValue);
     return { ...doc.data, [field]: transformedValue };
+  },
+
+  /**
+   * Prepare document data after removing a field
+   * @param doc - Original document
+   * @param fieldPath - Dot notation path of the field to remove, relative to doc.data
+   * @returns New document data with the field removed. A missing intermediate path,
+   *          or a non-Map intermediate (array/primitive), is a no-op returning the
+   *          data unchanged
+   */
+  prepareDeleteData(doc: DocumentData, fieldPath: string): Record<string, FirestoreValue> {
+    const data: Record<string, FirestoreValue> = { ...doc.data };
+    const segments = fieldPath.split('.');
+    let target = data;
+    for (let i = 0; i < segments.length - 1; i += 1) {
+      const child = target[segments[i]];
+      if (getValueType(child) !== 'Map') {
+        return data;
+      }
+      const childCopy = { ...(child as Record<string, FirestoreValue>) };
+      target[segments[i]] = childCopy;
+      target = childCopy;
+    }
+    delete target[segments[segments.length - 1]];
+    return data;
   },
 };
 
