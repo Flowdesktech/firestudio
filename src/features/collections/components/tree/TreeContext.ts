@@ -33,6 +33,7 @@ export interface TreeContextValue {
    * @param fieldPath - Document-relative dot path (e.g. "profile.displayName")
    */
   onDeleteField: (docId: string, fieldPath: string, docData: DocumentData, docCollectionPath?: string) => void;
+  onAddField: (docId: string, parentPath: string, docData: DocumentData, docCollectionPath?: string) => void;
   getType: (value: FirestoreValue) => string;
   getTypeColor: (type: string, isDark: boolean) => string;
   formatValue: (value: FirestoreValue, type: string) => string;

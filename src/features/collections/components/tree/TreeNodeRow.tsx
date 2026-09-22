@@ -18,6 +18,7 @@ import {
   Storage as CollectionIcon,
   Description as DocumentIcon,
   DeleteOutline as DeleteOutlineIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { FirestoreValue } from '../../../../shared/utils/firestoreUtils';
 import {
@@ -76,6 +77,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
     onCellSave,
     onCellKeyDown,
     onDeleteField,
+    onAddField,
     getType,
     getTypeColor,
     formatValue,
@@ -91,6 +93,21 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   // Only real fields (top-level keys and map keys) are deletable. `fieldPath` is
   // deliberately omitted for documents, collections and array elements.
   const canDeleteField = Boolean(fieldPath && docId && docData && !isDoc && !isCollection);
+  const isMapRow = !isCollection && !isDoc && nodeType === 'Map';
+  const showAdd = isDoc || isMapRow;
+  const parentPath = (() => {
+    if (isDoc) return '';
+    if (!isMapRow || !docId) return '';
+    const prefix = docCollectionPath ? `${docCollectionPath}/${docId}.` : null;
+    if (prefix && path.startsWith(prefix)) return path.slice(prefix.length);
+    return nodeKey;
+  })();
+
+  const handleAddField = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!docId || !docData) return;
+    onAddField(docId, parentPath, docData, docCollectionPath);
+  };
   const isExpanded = expandedNodes[path];
   const displayValue = isExpandable ? '' : formatValue(value, nodeType);
   const isEditing =
@@ -129,6 +146,7 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
       <TableRow
         sx={{ '&:hover': { bgcolor: 'action.hover' }, '&:hover .tree-delete-field': { visibility: 'visible' } }}
       >
+      <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' }, '&:hover .add-field-btn': { opacity: 1 } }}>
         <TableCell
           sx={{
             py: 0.25,
@@ -163,6 +181,18 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
             >
               {nodeKey}
             </Typography>
+            {showAdd && (
+              <IconButton
+                size="small"
+                title="Add field"
+                aria-label="Add field"
+                className="add-field-btn"
+                onClick={handleAddField}
+                sx={{ p: 0.25, ml: 0.5, opacity: 0, '&:focus-visible': { opacity: 1 } }}
+              >
+                <AddIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            )}
           </Box>
         </TableCell>
         <TableCell sx={{ py: 0.25, borderBottom: 1, borderRight: 1, borderColor: 'divider' }}>
