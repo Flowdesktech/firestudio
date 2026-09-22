@@ -100,6 +100,12 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
     if (!isMapRow || !docId) return '';
     const prefix = docCollectionPath ? `${docCollectionPath}/${docId}.` : null;
     if (prefix && path.startsWith(prefix)) return path.slice(prefix.length);
+    // Fallback when the collection path is unavailable: strip up to the
+    // document boundary instead of returning the bare key, so deeply nested
+    // maps still resolve to their full relative parent path.
+    const marker = `${docId}.`;
+    const idx = path.indexOf(marker);
+    if (idx >= 0) return path.slice(idx + marker.length);
     return nodeKey;
   })();
 

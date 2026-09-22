@@ -160,9 +160,16 @@ export const documentService = {
 
     let cloned: Record<string, FirestoreValue>;
     try {
-      cloned = JSON.parse(JSON.stringify(docData ?? {})) as Record<string, FirestoreValue>;
+      cloned =
+        typeof structuredClone === 'function'
+          ? (structuredClone(docData ?? {}) as Record<string, FirestoreValue>)
+          : (JSON.parse(JSON.stringify(docData ?? {})) as Record<string, FirestoreValue>);
     } catch {
-      return { error: 'Document data is not plain serializable data' };
+      try {
+        cloned = JSON.parse(JSON.stringify(docData ?? {})) as Record<string, FirestoreValue>;
+      } catch {
+        return { error: 'Document data is not plain serializable data' };
+      }
     }
 
     let parent: unknown = cloned;
