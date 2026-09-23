@@ -8,7 +8,7 @@ const fs = require('fs');
 const vm = require('vm');
 const { FieldValue, Filter, Timestamp, GeoPoint } = require('firebase-admin/firestore');
 const { fetchDocumentsPage } = require('./firestore/documentList');
-const { firestoreDocumentToData } = require('../utils/firestoreHelpers');
+const { firestoreDocumentToData, toFirestoreAdminValue } = require('../utils/firestoreHelpers');
 
 let dbRef = null;
 
@@ -101,7 +101,7 @@ function registerHandlers() {
       const docRef = documentId
         ? dbRef.collection(collectionPath).doc(documentId)
         : dbRef.collection(collectionPath).doc();
-      await docRef.set(data);
+      await docRef.set(toFirestoreAdminValue(data, { Timestamp, GeoPoint, FieldValue }));
       return { success: true, documentId: docRef.id };
     } catch (error) {
       return { success: false, error: error.message };
@@ -112,7 +112,7 @@ function registerHandlers() {
   ipcMain.handle('firestore:updateDocument', async (event, { documentPath, data }) => {
     try {
       if (!dbRef) throw new Error('Not connected to Firebase');
-      await dbRef.doc(documentPath).update(data);
+      await dbRef.doc(documentPath).update(toFirestoreAdminValue(data, { Timestamp, GeoPoint, FieldValue }));
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -123,7 +123,7 @@ function registerHandlers() {
   ipcMain.handle('firestore:setDocument', async (event, { documentPath, data }) => {
     try {
       if (!dbRef) throw new Error('Not connected to Firebase');
-      await dbRef.doc(documentPath).set(data);
+      await dbRef.doc(documentPath).set(toFirestoreAdminValue(data, { Timestamp, GeoPoint, FieldValue }));
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -212,7 +212,7 @@ function registerHandlers() {
 
         for (const [docId, docData] of Object.entries(data)) {
           const docRef = dbRef.collection(collectionPath).doc(docId);
-          batch.set(docRef, docData);
+          batch.set(docRef, toFirestoreAdminValue(docData, { Timestamp, GeoPoint, FieldValue }));
           count++;
           if (count >= 500) {
             await batch.commit();

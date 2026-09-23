@@ -65,6 +65,7 @@ import {
   resolveSimpleQueryPath,
 } from '../../../shared/utils';
 import { generateJsQueryFromSimpleParams } from '../../../shared/utils/queryUtils';
+import { documentService } from '../services/documentService';
 
 // Sub-components
 import QueryBar from './QueryBar';
@@ -76,6 +77,7 @@ import TreeView from './TreeView';
 import JsonView from './JsonView';
 import { useTreeSubcollections } from '../hooks/useTreeSubcollections';
 import CreateDocumentDialog from './CreateDocumentDialog';
+import AddFieldDialog from './tree/AddFieldDialog';
 import SettingsDialog from '../../../app/components/SettingsDialog';
 
 type ViewMode = SettingsState['defaultViewType'];
@@ -401,6 +403,12 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [addFieldTarget, setAddFieldTarget] = useState<{
+    docId: string;
+    parentPath: string;
+    docData: DocumentData;
+    collectionPath?: string;
+  } | null>(null);
   const [collectionPathInput, setCollectionPathInput] = useState(documentPath || collectionPath);
 
   useEffect(() => {
@@ -621,6 +629,39 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     [handleCellSave],
   );
 
+  // Delete a field from a document. Reuses `updateDocument`, which writes the whole
+  // document data object, so omitting the key removes it from Firestore.
+  const handleDeleteField = useCallback(
+    async (docId: string, fieldPath: string, docData: DocumentData, docCollectionPath?: string) => {
+      // Subcollection documents live at their own collection path; root docs keep the tab's path
+      const targetCollectionPath = docCollectionPath ?? collectionPath;
+      const source: DocumentData | undefined =
+        docData && typeof docData === 'object' ? docData : documents.find((d) => d.id === docId)?.data;
+      if (!source) return;
+
+      const newData = documentService.prepareDeleteData({ id: docId, data: source }, fieldPath);
+
+      try {
+        await dispatch(
+          updateDocument({
+            project,
+            collection: targetCollectionPath,
+            docId,
+            docData: newData,
+            firestoreDatabaseId,
+          }),
+        ).unwrap();
+        showMessage?.(`Deleted field ${fieldPath} from document ${docId}`, 'success');
+        if (targetCollectionPath !== collectionPath) {
+          refreshDocuments(targetCollectionPath);
+        }
+      } catch (error) {
+        showError(error);
+      }
+    },
+    [documents, dispatch, project, collectionPath, firestoreDatabaseId, refreshDocuments, showMessage, showError],
+  );
+
   // JSON Save Handler
   const handleJsonSave = useCallback(async () => {
     try {
@@ -707,6 +748,68 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
       setDeleteLoading(false);
     }
   }, [selectedRows, project, collectionPath, firestoreDatabaseId, showMessage, dispatch, showError]);
+
+  // Add Field Handlers (Tree view)
+  const handleAddField = useCallback(
+    (docId: string, parentPath: string, docData: DocumentData, docCollectionPath?: string) => {
+      setAddFieldTarget({ docId, parentPath, docData, collectionPath: docCollectionPath });
+    },
+    [],
+  );
+
+  const handleAddFieldSubmit = useCallback(
+    async (fieldName: string, value: FirestoreValue) => {
+      if (!addFieldTarget) return;
+      const targetCollectionPath = addFieldTarget.collectionPath ?? collectionPath;
+      const docRecord = addFieldTarget.docData as unknown as Record<string, FirestoreValue>;
+      const result = documentService.prepareAddData(docRecord, addFieldTarget.parentPath, fieldName, value);
+      if ('error' in result) {
+        showMessage?.(result.error, 'error');
+        return;
+      }
+      try {
+        await dispatch(
+          updateDocument({
+            project,
+            collection: targetCollectionPath,
+            docId: addFieldTarget.docId,
+            docData: result.data as DocumentData,
+            firestoreDatabaseId,
+          }),
+        ).unwrap();
+        const location = addFieldTarget.parentPath
+          ? `${addFieldTarget.docId}.${addFieldTarget.parentPath}.${fieldName}`
+          : `${addFieldTarget.docId}.${fieldName}`;
+        showMessage?.(`Added field ${location}`, 'success');
+        if (targetCollectionPath !== collectionPath) {
+          refreshDocuments(targetCollectionPath);
+        }
+        setAddFieldTarget(null);
+      } catch (error) {
+        showError(error);
+      }
+    },
+    [addFieldTarget, collectionPath, dispatch, project, firestoreDatabaseId, refreshDocuments, showMessage, showError],
+  );
+
+  const addFieldExistingKeys = (() => {
+    if (!addFieldTarget) return [] as string[];
+    let parent: unknown = addFieldTarget.docData as unknown;
+    if (addFieldTarget.parentPath) {
+      for (const segment of addFieldTarget.parentPath.split('.')) {
+        if (parent === null || typeof parent !== 'object' || Array.isArray(parent)) return [];
+        parent = (parent as Record<string, FirestoreValue>)[segment];
+      }
+    }
+    if (parent === null || typeof parent !== 'object' || Array.isArray(parent)) return [];
+    return Object.keys(parent as Record<string, FirestoreValue>);
+  })();
+
+  const addFieldParentLabel = addFieldTarget
+    ? addFieldTarget.parentPath
+      ? `${addFieldTarget.docId}.${addFieldTarget.parentPath}`
+      : addFieldTarget.docId
+    : '';
 
   // Type utility wrappers for child components
   const getType = useCallback((value: FirestoreValue) => getValueType(value), []);
@@ -869,6 +972,8 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
                   handleCellSave();
                 }} // Explicitly call handleCellSave
                 onCellKeyDown={handleCellKeyDown}
+                onDeleteField={handleDeleteField}
+                onAddField={handleAddField}
                 getType={getType}
                 getTypeColor={getColor}
                 formatValue={formatValue}
@@ -902,6 +1007,15 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
         newDocData={newDocData}
         setNewDocData={setNewDocData}
         onCreate={handleCreateDocument}
+      />
+
+      {/* Add Field Dialog (Tree view) */}
+      <AddFieldDialog
+        open={Boolean(addFieldTarget)}
+        parentPathLabel={addFieldParentLabel}
+        existingKeys={addFieldExistingKeys}
+        onClose={() => setAddFieldTarget(null)}
+        onSubmit={handleAddFieldSubmit}
       />
 
       {/* Settings Dialog */}
