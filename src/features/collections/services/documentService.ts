@@ -140,8 +140,10 @@ export const documentService = {
     }
     delete target[segments[segments.length - 1]];
     return data;
-   /**
-    * Prepare document data with a new field added at a nested dot-path.
+  },
+
+  /**
+   * Prepare document data with a new field added at a nested dot-path.
    * @param docData - Current document fields
    * @param parentPath - Dot-path of the parent object relative to the doc ("" for doc root)
    * @param fieldName - New field name (single segment, no dots)

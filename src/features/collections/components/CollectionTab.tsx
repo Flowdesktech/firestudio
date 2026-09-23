@@ -77,7 +77,6 @@ import JsonView from './JsonView';
 import { useTreeSubcollections } from '../hooks/useTreeSubcollections';
 import CreateDocumentDialog from './CreateDocumentDialog';
 import AddFieldDialog from './tree/AddFieldDialog';
-import { documentService } from '../services/documentService';
 import SettingsDialog from '../../../app/components/SettingsDialog';
 
 type ViewMode = SettingsState['defaultViewType'];

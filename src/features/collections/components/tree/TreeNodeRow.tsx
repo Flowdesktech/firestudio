@@ -150,9 +150,12 @@ const TreeNodeRow: React.FC<TreeNodeRowProps> = ({
   return (
     <>
       <TableRow
-        sx={{ '&:hover': { bgcolor: 'action.hover' }, '&:hover .tree-delete-field': { visibility: 'visible' } }}
+        sx={{
+          '&:hover': { bgcolor: 'action.hover' },
+          '&:hover .tree-delete-field': { visibility: 'visible' },
+          '&:hover .add-field-btn': { opacity: 1 },
+        }}
       >
-      <TableRow sx={{ '&:hover': { bgcolor: 'action.hover' }, '&:hover .add-field-btn': { opacity: 1 } }}>
         <TableCell
           sx={{
             py: 0.25,
