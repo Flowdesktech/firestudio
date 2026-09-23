@@ -39,6 +39,8 @@ export {
   documentsToJson,
   createEmptyFilter,
   createDefaultSortConfig,
+  normalizeFirestorePath,
+  resolveSimpleQueryPath,
 } from './collectionUtils';
 
 // Common utilities
