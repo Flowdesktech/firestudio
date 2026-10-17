@@ -395,6 +395,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
   const [jsonEditData, setJsonEditData] = useState('');
   const [jsonHasChanges, setJsonHasChanges] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const [newDocId, setNewDocId] = useState('');
   const [newDocData, setNewDocData] = useState('{}');
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
@@ -703,6 +704,45 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
     }
   }, [newDocId, newDocData, dispatch, project, collectionPath, firestoreDatabaseId, showMessage, showError]);
 
+  // Duplicate the single selected table document using the create flow.
+  const handleDuplicateDocument = useCallback(() => {
+    if (selectedRows.length !== 1) return;
+    const source = documents.find((doc) => doc.id === selectedRows[0]);
+    if (!source) return;
+
+    const existingIds = new Set(documents.map((doc) => doc.id));
+    const baseId = `${source.id}_copy`;
+    let duplicateId = baseId;
+    let suffix = 2;
+    while (existingIds.has(duplicateId)) duplicateId = `${baseId}_${suffix++}`;
+
+    setNewDocId(duplicateId);
+    setNewDocData(JSON.stringify(source.data, null, 2));
+    setDuplicateDialogOpen(true);
+  }, [documents, selectedRows]);
+
+  const handleDuplicateCreate = useCallback(async () => {
+    try {
+      JSON.parse(newDocData);
+      const createdId = await dispatch(
+        addDocument({
+          project,
+          collection: collectionPath,
+          docId: newDocId,
+          docData: newDocData,
+          firestoreDatabaseId,
+        }),
+      ).unwrap();
+      setDuplicateDialogOpen(false);
+      setNewDocId('');
+      setNewDocData('{}');
+      setSelectedRows([]);
+      showMessage?.(`Duplicated document as ${createdId || newDocId}`, 'success');
+    } catch (error: unknown) {
+      showError(error);
+    }
+  }, [newDocData, newDocId, dispatch, project, collectionPath, firestoreDatabaseId, showMessage, showError]);
+
   // Delete Selected Documents Handler
   const handleDeleteSelected = useCallback(async () => {
     if (selectedRows.length === 0) return;
@@ -923,6 +963,7 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
         onImport={handleImportDocuments}
         onAdd={() => setCreateDialogOpen(true)}
         onDelete={() => setDeleteDialogOpen(true)}
+        onDuplicate={handleDuplicateDocument}
         allFields={allFields}
         visibleFields={visibleFields}
         hiddenColumns={hiddenColumns}
@@ -1007,6 +1048,19 @@ const CollectionTab: React.FC<CollectionTabProps> = ({
         newDocData={newDocData}
         setNewDocData={setNewDocData}
         onCreate={handleCreateDocument}
+      />
+
+      {/* Duplicate Document Dialog */}
+      <CreateDocumentDialog
+        open={duplicateDialogOpen}
+        onClose={() => setDuplicateDialogOpen(false)}
+        newDocId={newDocId}
+        setNewDocId={setNewDocId}
+        newDocData={newDocData}
+        setNewDocData={setNewDocData}
+        onCreate={handleDuplicateCreate}
+        title="Duplicate Document"
+        actionLabel="Duplicate"
       />
 
       {/* Add Field Dialog (Tree view) */}

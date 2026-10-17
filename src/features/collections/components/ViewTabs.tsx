@@ -10,6 +10,7 @@ import {
   FileUpload as ImportIcon,
   ViewColumn as ColumnsIcon,
   Delete as DeleteIcon,
+  ContentCopy as DuplicateIcon,
 } from '@mui/icons-material';
 
 interface ViewTabsProps {
@@ -21,6 +22,7 @@ interface ViewTabsProps {
   onImport: () => void;
   onAdd: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   allFields: string[];
   visibleFields: string[];
   hiddenColumns: Record<string, boolean>;
@@ -37,6 +39,7 @@ const ViewTabs: React.FC<ViewTabsProps> = ({
   onImport,
   onAdd,
   onDelete,
+  onDuplicate,
   allFields,
   visibleFields,
   hiddenColumns,
@@ -165,6 +168,13 @@ const ViewTabs: React.FC<ViewTabsProps> = ({
           >
             Delete ({selectedRowsCount})
           </Button>
+        </Tooltip>
+      )}
+      {selectedRowsCount === 1 && (
+        <Tooltip title="Duplicate selected document">
+          <IconButton size="small" onClick={onDuplicate}>
+            <DuplicateIcon sx={{ fontSize: 18 }} />
+          </IconButton>
         </Tooltip>
       )}
       <Tooltip title="Refresh">
