@@ -9,6 +9,8 @@ interface CreateDocumentDialogProps {
   newDocData: string;
   setNewDocData: (data: string) => void;
   onCreate: () => void;
+  title?: string;
+  actionLabel?: string;
 }
 
 const CreateDocumentDialog: React.FC<CreateDocumentDialogProps> = ({
@@ -19,10 +21,13 @@ const CreateDocumentDialog: React.FC<CreateDocumentDialogProps> = ({
   newDocData,
   setNewDocData,
   onCreate,
+  title = 'Create Document',
+  actionLabel = 'Create',
 }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Create Document</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <TextField
           fullWidth
@@ -46,6 +51,7 @@ const CreateDocumentDialog: React.FC<CreateDocumentDialogProps> = ({
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" onClick={onCreate}>
           Create
+          {actionLabel}
         </Button>
       </DialogActions>
     </Dialog>
